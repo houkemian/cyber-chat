@@ -188,6 +188,7 @@ body {
 .auth-btn {
   position: relative;
   min-width: 62px;
+  max-width: 160px;
   border-radius: 2px;
   border: 2px solid #88c7ff;
   border-top-color: #d8f0ff;
@@ -196,13 +197,17 @@ body {
   border-bottom-color: #3a5778;
   background: linear-gradient(180deg, rgba(22, 32, 72, 0.95), rgba(10, 14, 35, 0.94));
   color: #cffafe;
-  font-size: 12px;
+  font-size: 11px;
   font-family: "Courier New", "Consolas", monospace;
-  letter-spacing: 0.04em;
-  padding: 7px 11px;
+  letter-spacing: 0.03em;
+  padding: 7px 10px;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-shadow: 0 0 6px rgba(0, 240, 255, 0.45);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 0 12px rgba(0, 240, 255, 0.22);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .auth-btn::before {
@@ -232,6 +237,123 @@ body {
   opacity: 0.28;
   animation: static-grain 0.32s steps(2, end) infinite;
   pointer-events: none;
+}
+
+/* ── 传送按钮：Y2K 霓虹像素风 ── */
+.auth-btn-teleport {
+  position: relative;
+  display: inline-block;
+  padding: 7px 14px;
+  background: transparent;
+  border: 2px solid #ff00ff;
+  border-radius: 0;
+  color: #ff00ff;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  /* 霓虹外发光 */
+  text-shadow:
+    0 0 6px #ff00ff,
+    0 0 14px #ff00ff;
+  box-shadow:
+    0 0 8px #ff00ff,
+    0 0 20px rgba(255, 0, 255, 0.4),
+    inset 0 0 8px rgba(255, 0, 255, 0.08);
+  /* 默认常态：粉蓝闪烁 */
+  animation: teleport-idle 2s steps(2, end) infinite;
+  overflow: hidden;
+}
+
+/* 扫描线叠层 */
+.auth-btn-teleport::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 0, 255, 0.04) 2px,
+    rgba(255, 0, 255, 0.04) 3px
+  );
+  z-index: 0;
+}
+
+.auth-btn-teleport span {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hover：故障抖动 + 粉蓝交替发光加强 */
+.auth-btn-teleport:hover {
+  animation: teleport-glitch 0.22s steps(2, end) infinite;
+  border-color: #00ffff;
+  color: #00ffff;
+}
+
+.auth-btn-teleport:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 4px #00ffff,
+    0 0 10px rgba(0, 255, 255, 0.4);
+}
+
+/* 常态：粉蓝发光切换 */
+@keyframes teleport-idle {
+  0%, 100% {
+    border-color: #ff00ff;
+    color: #ff00ff;
+    text-shadow: 0 0 6px #ff00ff, 0 0 14px #ff00ff;
+    box-shadow: 0 0 8px #ff00ff, 0 0 20px rgba(255, 0, 255, 0.35), inset 0 0 6px rgba(255, 0, 255, 0.06);
+  }
+  50% {
+    border-color: #00ffff;
+    color: #e0faff;
+    text-shadow: 0 0 6px #00ffff, 0 0 14px #00ffff;
+    box-shadow: 0 0 8px #00ffff, 0 0 20px rgba(0, 255, 255, 0.35), inset 0 0 6px rgba(0, 255, 255, 0.06);
+  }
+}
+
+/* Hover：文字故障抖动，色差分离 */
+@keyframes teleport-glitch {
+  0% {
+    text-shadow:
+      2px 0 #ff00ff,
+      -2px 0 #00ffff,
+      0 0 14px #ff00ff;
+    transform: translateX(0);
+    border-color: #ff00ff;
+    color: #ff00ff;
+    box-shadow: 0 0 12px #ff00ff, 0 0 28px rgba(255, 0, 255, 0.5);
+  }
+  50% {
+    text-shadow:
+      -2px 0 #00ffff,
+      2px 0 #ff00ff,
+      0 0 14px #00ffff;
+    transform: translateX(1px);
+    border-color: #00ffff;
+    color: #00ffff;
+    box-shadow: 0 0 12px #00ffff, 0 0 28px rgba(0, 255, 255, 0.5);
+  }
+  100% {
+    text-shadow:
+      1px 1px #ff00ff,
+      -1px -1px #00ffff,
+      0 0 14px #ff00ff;
+    transform: translateX(-1px);
+    border-color: #ff00ff;
+    color: #ff00ff;
+    box-shadow: 0 0 12px #ff00ff, 0 0 28px rgba(255, 0, 255, 0.5);
+  }
 }
 
 .auth-btn-primary {

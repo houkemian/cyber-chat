@@ -11,6 +11,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false)
   const [noisePhase, setNoisePhase] = useState(0)
   const [chatHeight, setChatHeight] = useState('60vh')
+  const [loginSeq, setLoginSeq] = useState(0)
   const headerRef = useRef<HTMLElement>(null)
   const navigate = useNavigate()
 
@@ -54,6 +55,7 @@ function App() {
     setIsLoggedIn(true)
     setCyberName(name)
     setShowLogin(false)
+    setLoginSeq((n) => n + 1)
     navigate(`/chat/${DEFAULT_ROOM_ID}`, { replace: true })
   }, [navigate])
 
@@ -106,10 +108,10 @@ function App() {
                   <div className="auth-actions">
                     <button
                       type="button"
-                      className="auth-btn auth-btn-uplink"
+                      className="auth-btn-teleport"
                       onClick={() => setShowLogin(true)}
                     >
-                      {'神经潜入 (Neural Dive)'}
+                      <span>[ 传送：GO! ]</span>
                     </button>
                   </div>
                 )}
@@ -122,7 +124,7 @@ function App() {
             style={{ height: chatHeight, minHeight: 0, flexShrink: 0 }}
           >
             <Routes>
-              <Route path="/chat/:room_id" element={<RoomChat embedded />} />
+              <Route path="/chat/:room_id" element={<RoomChat embedded loginSeq={loginSeq} />} />
               <Route path="/chat" element={<Navigate to={`/chat/${DEFAULT_ROOM_ID}`} replace />} />
               <Route path="*" element={<Navigate to={`/chat/${DEFAULT_ROOM_ID}`} replace />} />
             </Routes>

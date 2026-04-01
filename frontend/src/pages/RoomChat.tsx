@@ -34,6 +34,7 @@ type HistoryApiMessage = {
 
 interface RoomChatProps {
   embedded?: boolean
+  loginSeq?: number
 }
 
 const PRESET_SECTORS = [
@@ -97,7 +98,7 @@ function RoomMessageLine({ msg, isHistory }: RoomMessageLineProps) {
   )
 }
 
-export function RoomChat({ embedded = false }: RoomChatProps) {
+export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
   const { room_id } = useParams<{ room_id: string }>()
   const navigate = useNavigate()
   const roomId = useMemo(() => {
@@ -293,7 +294,7 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
       }
       wsRef.current?.close()
     }
-  }, [roomId])
+  }, [roomId, loginSeq])
 
   useEffect(() => {
     if (systemListRef.current) {
