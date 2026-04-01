@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class SendKeyRequest(BaseModel):
+    # 地球维度通讯终端号（手机号）
+    phone_number: str = Field(min_length=6, max_length=32)
+
+
+class VerifyKeyRequest(BaseModel):
+    # 再次携带终端号 + 跃迁密匙
+    phone_number: str = Field(min_length=6, max_length=32)
+    sms_code: str = Field(min_length=4, max_length=8)
+
+
+class AuthResponse(BaseModel):
+    # JWT 访问令牌 + 系统分配的千禧网名
+    token: str
+    cyber_name: str
