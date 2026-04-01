@@ -174,49 +174,102 @@ function AnnouncementPanel() {
   )
 }
 
-// ── 在线成员蒙层 ──────────────────────────────────────────────
-interface MembersOverlayProps {
+// ── 雷达扫描成员组件 ──────────────────────────────────────────
+interface RadarScanProps {
   roomName: string
   onClose: () => void
   memberList: string[]
 }
 
-function MembersOverlay({ roomName, onClose, memberList }: MembersOverlayProps) {
-  return (
-    <div className="members-overlay-mask" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="members-overlay-box">
-        {/* 做旧纹理层 */}
-        <div className="members-aged-layer" aria-hidden />
-        <div className="members-scanlines" aria-hidden />
-        <div className="members-vignette" aria-hidden />
+// 每个成员在扫描线经过时渐显，延迟由其在列表中的位置决定
+const SCAN_DURATION_MS = 2200   // 扫描线从底到顶总时长
 
-        <div className="members-overlay-header">
-          <span className="members-overlay-title">
-            <span className="members-title-blink">▶</span>
-            {' '}SCAN://扇区探测 · {roomName}
-          </span>
-          <button type="button" className="members-overlay-close" onClick={onClose}>✕</button>
+function RadarScan({ roomName, onClose, memberList }: RadarScanProps) {
+  const [phase, setPhase] = useState<'scanning' | 'revealed'>('scanning')
+  const [visibleCount, setVisibleCount] = useState(0)
+  const total = memberList.length
+
+  useEffect(() => {
+    if (total === 0) {
+      // 无成员时扫完直接跳到 revealed
+      const t = window.setTimeout(() => setPhase('revealed'), SCAN_DURATION_MS)
+      return () => window.clearTimeout(t)
+    }
+
+    // 扫描线从底向上，按比例触发每个成员浮现
+    const timers: number[] = []
+    for (let i = 0; i < total; i++) {
+      // 越靠下（索引大）越先出现（扫描线从下往上）
+      const revIdx = total - 1 - i
+      const delay = Math.round((revIdx / Math.max(total - 1, 1)) * (SCAN_DURATION_MS * 0.85))
+      timers.push(window.setTimeout(() => {
+        setVisibleCount((c) => c + 1)
+      }, delay))
+    }
+    const doneTimer = window.setTimeout(() => setPhase('revealed'), SCAN_DURATION_MS)
+    timers.push(doneTimer)
+    return () => timers.forEach(window.clearTimeout)
+  }, [total])
+
+  return (
+    <div className="radar-mask" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      {/* 做旧背景层 */}
+      <div className="radar-aged" aria-hidden />
+      <div className="radar-bg-scanlines" aria-hidden />
+      <div className="radar-vignette" aria-hidden />
+
+      {/* 雷达扫描线（仅 scanning 阶段）*/}
+      {phase === 'scanning' && (
+        <div className="radar-beam" aria-hidden>
+          <div className="radar-beam-line" />
+          <div className="radar-beam-glow" />
         </div>
-        <div className="members-overlay-list">
-          {memberList.length === 0 ? (
-            <p className="members-empty">[ 探测范围内无新增终端 ]<br /><span className="members-empty-sub">仅显示您接入后上线的用户</span></p>
-          ) : (
-            memberList.map((name, i) => (
-              <div key={i} className="members-item">
-                <img
-                  className="members-avatar"
-                  src={getAvatarUrl(name)}
-                  alt={name}
-                />
-                <span className="members-name">{name}</span>
-                <span className="members-status-dot" />
+      )}
+
+      {/* 顶部标题 */}
+      <div className="radar-header">
+        <span className="radar-title-blink">▶▶</span>
+        <span className="radar-title">SCAN://扇区探测 · {roomName}</span>
+        <button type="button" className="radar-close-btn" onClick={onClose}>✕</button>
+      </div>
+
+      {/* 成员列表区，从下方往上按位置浮现 */}
+      <div className="radar-members">
+        {total === 0 ? (
+          <div className={`radar-empty ${phase === 'revealed' ? 'radar-member-show' : ''}`}>
+            <span>[ 扫描完毕 · 未探测到其他终端 ]</span>
+          </div>
+        ) : (
+          memberList.map((name, i) => {
+            // 反序：索引越大越先出现（扫描线从下往上，先扫到底部成员）
+            const revIdx = total - 1 - i
+            const isVisible = revIdx < visibleCount
+            return (
+              <div
+                key={name}
+                className={`radar-member-row ${isVisible ? 'radar-member-show' : ''}`}
+                style={{ transitionDelay: `0ms` }}
+              >
+                <img className="radar-avatar" src={getAvatarUrl(name)} alt={name} />
+                <span className="radar-name">{name}</span>
+                <span className="radar-node-dot" />
+                <span className="radar-node-label">NODE_ACTIVE</span>
               </div>
-            ))
-          )}
-        </div>
-        <div className="members-overlay-footer">
-          ◈ LIVE NODES · {memberList.length} 个终端已被探测
-        </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* 底部状态栏 */}
+      <div className="radar-footer">
+        <span className={`radar-footer-status ${phase === 'scanning' ? 'radar-scanning-blink' : ''}`}>
+          {phase === 'scanning' ? '◈ 扫描中...' : `◈ 探测完毕 · ${total} 个终端`}
+        </span>
+        {phase === 'revealed' && (
+          <button type="button" className="radar-dismiss-btn" onClick={onClose}>
+            [ 关闭 ]
+          </button>
+        )}
       </div>
     </div>
   )
@@ -253,6 +306,7 @@ export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
   const [isHistorySyncing, setIsHistorySyncing] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
   const [memberList, setMemberList] = useState<string[]>([])
+  const [inputFocused, setInputFocused] = useState(false)
 
   const syncExpectedCount = 200
   const systemMessages = useMemo(() => messages.filter((msg) => msg.type === 'system'), [messages])
@@ -633,15 +687,21 @@ export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
           )}
 
           {/* ── 命令面板（输入区 5% 占位由 flex-shrink:0 控制）── */}
-          <div className="cmd-panel">
-            {/* 探测成员按钮 */}
+          <div className={`cmd-panel ${inputFocused ? 'cmd-panel-powered' : ''}`}>
+            {/* 探测成员图标按钮 */}
             <button
               type="button"
-              className="cmd-members-btn"
+              className="cmd-scan-icon-btn"
               onClick={() => setShowMembers(true)}
               title="探测当前扇区在线终端"
+              aria-label="探测成员"
             >
-              <span>[ 探测<br />SCAN ]</span>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
+                <line x1="12" y1="12" x2="12" y2="3" stroke="currentColor" strokeWidth="1.5" className="radar-sweep-hand" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+              </svg>
             </button>
 
             <label className="cmd-input-wrap">
@@ -654,6 +714,8 @@ export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSend()
                 }}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -667,7 +729,7 @@ export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
               onClick={handleSend}
               disabled={channelState !== 'online'}
             >
-              <span>[ 执行传输<br />X-MISSION ]</span>
+              <span>[ 传输<br />TX ]</span>
             </button>
           </div>
 
@@ -694,9 +756,9 @@ export function RoomChat({ embedded = false, loginSeq = 0 }: RoomChatProps) {
         </div>
       </div>
 
-      {/* ── 在线成员蒙层 ── */}
+      {/* ── 雷达扫描蒙层 ── */}
       {showMembers && (
-        <MembersOverlay
+        <RadarScan
           roomName={roomName}
           onClose={() => setShowMembers(false)}
           memberList={memberList}
