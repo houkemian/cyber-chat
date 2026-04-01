@@ -16,7 +16,7 @@ jobs:
     - name: 2. 设置 Node.js 环境 (利用 GitHub 的服务器)
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: 3. 构建前端静态文件
       run: |
