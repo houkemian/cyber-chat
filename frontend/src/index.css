@@ -47,6 +47,7 @@
 html,
 body {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -61,12 +62,14 @@ body {
 
 #root {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
 }
 
 .page {
   position: relative;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   color: #d4d6ff;
 }
@@ -134,6 +137,11 @@ body {
   height: 100%;
   margin: 0 auto;
   padding: 16px;
+  /* iOS 安全区适配（刘海屏 / home bar），非 iOS 时 env() 返回 0 无影响 */
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2681,8 +2689,18 @@ body {
    ══════════════════════════════════════════ */
 
 @media (max-width: 480px) {
+  /* 压缩容器内边距和间隙，减少垂直空间占用；保留 iOS 安全区 */
+  .container {
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    gap: 8px;
+  }
+
   .header {
-    padding: 8px 10px;
+    padding: 7px 10px;
   }
 
   .header-top {
@@ -2691,9 +2709,7 @@ body {
   }
 
   .tag {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    display: none; /* 极小屏隐藏副标题节省空间 */
+    display: none;
   }
 
   .title {
@@ -2714,6 +2730,11 @@ body {
   .auth-btn-teleport {
     font-size: 10px;
     padding: 5px 10px;
+  }
+
+  /* 聊天区圆角稍微压缩 */
+  .card {
+    border-radius: 10px;
   }
 }
 

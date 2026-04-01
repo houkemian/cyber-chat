@@ -56,8 +56,15 @@ function App() {
       if (!headerRef.current) return
       const headerH = headerRef.current.getBoundingClientRect().height
       // container padding: 16px top + 16px bottom = 32px；gap between header and section: 14px
-      const reserved = headerH + 32 + 14
-      setChatHeight(`calc(100vh - ${reserved}px)`)
+      // 移动端用 dvh 单位（随地址栏动态收缩），桌面降级到 vh
+      const vhUnit = CSS.supports('height', '1dvh') ? 'dvh' : 'vh'
+      // container padding: 16px top + 16px bottom = 32px；gap: 14px
+      // 移动端 padding 已压缩至 8px，故 reserved 更小
+      const isMobile = window.innerWidth <= 480
+      const containerPad = isMobile ? 16 : 32   // 8px top+bottom on mobile
+      const gapVal = isMobile ? 8 : 14
+      const reserved = headerH + containerPad + gapVal
+      setChatHeight(`calc(100${vhUnit} - ${reserved}px)`)
     }
     recalc()
     window.addEventListener('resize', recalc)
@@ -104,7 +111,7 @@ function App() {
   return (
     <>
       {/* ── 主页面 ── */}
-      <div className="page h-screen overflow-hidden" data-noise-phase={noisePhase}>
+      <div className="page overflow-hidden" data-noise-phase={noisePhase}>
         <div className="fx-layer">
           <span className="spark spark-cyan"></span>
           <span className="spark spark-pink"></span>
