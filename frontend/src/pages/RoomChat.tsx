@@ -46,7 +46,16 @@ const PRESET_SECTORS = [
 function toClock(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '--:--'
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  const now = new Date()
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  const hhmm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  if (isToday) return hhmm
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${mm}-${dd} ${hhmm}`
 }
 
 function roomTheme(roomId: string): string {
@@ -336,17 +345,19 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className={`border-2 border-t-white border-l-white border-r-gray-700 border-b-gray-700 bg-[#bdbdbd] p-[3px] ${embedded ? '' : 'shadow-[8px_8px_0_#1c1c1c]'}`}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }} className={`global-chat-grain border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white bg-[#090910]`}>
-          <div className="shrink-0 flex flex-wrap gap-2 border-b border-[#463264] bg-[#15112a] px-2 py-2">
-            {PRESET_SECTORS.map((sector) => (
-              <button
-                key={sector.id}
-                type="button"
-                className={`room-tab room-sector-tab ${roomId === sector.id ? 'active' : ''}`}
-                onClick={() => handleSwitchSector(sector.id)}
-              >
-                #{sector.name}
-              </button>
-            ))}
+          <div className="shrink-0 border-b border-[#463264] bg-[#15112a]" style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex gap-2 px-2 py-2" style={{ width: 'max-content', minWidth: '100%' }}>
+              {PRESET_SECTORS.map((sector) => (
+                <button
+                  key={sector.id}
+                  type="button"
+                  className={`room-tab room-sector-tab ${roomId === sector.id ? 'active' : ''}`}
+                  onClick={() => handleSwitchSector(sector.id)}
+                >
+                  #{sector.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div
@@ -355,8 +366,11 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
           >
             {/* 系统消息区：固定 20%，最小 96px */}
             <div style={{ flexShrink: 0, height: '20%', minHeight: '96px', overflow: 'hidden', display: 'flex', flexDirection: 'column', marginBottom: '8px' }} className="border border-amber-300/35 bg-[#15100b]/65">
-              <div className="border-b border-amber-300/35 px-2 py-1 text-[11px] text-amber-200">
-                [ SYSTEM FEED ]
+              <div className="panel-header-sys">
+                <span className="dot" />
+                <span className="title">SYS<span className="sep">://</span>FEED</span>
+                <span className="arrows">▸▸</span>
+                <span className="badge">◈&thinsp;MONITOR</span>
               </div>
               <div ref={systemListRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="space-y-1 px-2 py-2">
                 {systemMessages.length === 0 ? (
@@ -371,16 +385,30 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
 
             {/* 用户消息区：吃剩余全部高度，内部滚动 */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="border border-cyan-400/35 bg-[#0b1223]/62">
-              <div className="border-b border-cyan-400/35 px-2 py-1 text-[11px] text-cyan-200 shrink-0">
-                [ USER STREAM | ONLINE: {onlineCount} ]
+              <div className="panel-header-usr">
+                <span className={`dot ${channelState === 'online' ? 'online' : 'offline'}`} />
+                <span className="title">USR<span className="sep">://</span>STREAM</span>
+                <span className="arrows">▸▸</span>
+                <span className="online-count">ONLINE&thinsp;<strong>{onlineCount}</strong></span>
+                <span className={`badge ${channelState === 'online' ? 'online' : 'offline'}`}>◈&thinsp;LIVE</span>
               </div>
-              <div ref={userListRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }} className="space-y-3 px-2 py-2">
+              <div ref={userListRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }} className="px-2 py-2">
                 {userMessages.length === 0 && (
-                  <p className="text-gray-500">[系统提示] 正在接入扇区主干网络...</p>
+                  <p className="text-gray-500 font-mono text-[12px]">[系统提示] 正在接入扇区主干网络...</p>
                 )}
-                {userMessages.map((msg) => (
-                  <RoomMessageLine key={msg.id} msg={msg} isHistory={Boolean(msg.isHistory)} />
-                ))}
+                {(() => {
+                  const lastHistoryIdx = userMessages.map((m) => m.isHistory).lastIndexOf(true)
+                  // 历史同步完成后，分割线固定插在最后一条历史消息之后
+                  const showDivider = !isHistorySyncing && lastHistoryIdx >= 0
+                  return userMessages.map((msg, idx) => (
+                    <>
+                      <RoomMessageLine key={msg.id} msg={msg} isHistory={Boolean(msg.isHistory)} />
+                      {showDivider && idx === lastHistoryIdx && (
+                        <div key="echo-divider" className="data-echo-divider">DATA ECHO · 数据残响 ▾</div>
+                      )}
+                    </>
+                  ))
+                })()}
               </div>
             </div>
           </div>
@@ -400,18 +428,25 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
             </div>
           )}
 
-          <div className="z-10 shrink-0 flex gap-2 border-t border-[#2d2d2d] bg-black/90 p-3">
-            <input
-              className="flex-1 border border-[#39ff14]/60 bg-black px-3 py-2 font-mono text-sm text-[#39ff14] outline-none placeholder:text-[#39ff14]/45 focus:shadow-[0_0_10px_rgba(57,255,20,0.35)]"
-              placeholder="> 输入全频段广播消息..._"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSend()
-              }}
-            />
-            <button type="button" className="global-chat-send-btn" onClick={handleSend}>
-              广播数据 (Broadcast)
+          <div className="cmd-panel">
+            <label className="cmd-input-wrap">
+              <span className="cmd-prompt">&gt; //</span>
+              <input
+                className="cmd-input"
+                placeholder="终端信号源 · 输入全频段广播消息..._"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSend()
+                }}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+            </label>
+            <button type="button" className="cmd-exec-btn" onClick={handleSend}>
+              <span>[ 执行传输<br />X-MISSION ]</span>
             </button>
           </div>
 
