@@ -111,6 +111,10 @@ class ConnectionManager:
                 return []
             return [item for item in list(room_history)[-effective_limit:] if item.get("type") == "chat"]
 
+    def get_room_count(self, room_id: str) -> int:
+        """返回指定房间当前在线连接数。"""
+        return len(self.rooms.get(room_id, []))
+
     async def connect(self, websocket: WebSocket, room_id: str) -> None:
         """接入上行链路并登记到指定扇区连接池。"""
         await websocket.accept()

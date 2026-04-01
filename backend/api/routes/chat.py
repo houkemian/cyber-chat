@@ -86,6 +86,7 @@ async def chat_ws(websocket: WebSocket, room_id: str) -> None:
             "type": "system",
             "content": f"[系统]: 终端 <{cyber_name}> 已接入扇区 <{room}>。",
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            "online_count": ws_manager.get_room_count(room),
         },
         room,
     )
@@ -128,6 +129,7 @@ async def chat_ws(websocket: WebSocket, room_id: str) -> None:
                 "type": "system",
                 "content": f"[系统]: 终端 <{cyber_name}> 已断开扇区 <{room}>。",
                 "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "online_count": ws_manager.get_room_count(room),
             },
             room,
         )

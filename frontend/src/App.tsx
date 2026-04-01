@@ -4,6 +4,25 @@ import { LoginTerminal } from './pages/LoginTerminal'
 import { RoomChat } from './pages/RoomChat'
 
 const DEFAULT_ROOM_ID = 'sector-001'
+const AVATAR_STORAGE_KEY = 'cyber_avatar_idx'
+
+// ── 扩展头像池：保留像素人像 + 新增物件种子 ──────────────────
+// 前 4 个为像素人像（使用 pixel-art style），后续为物件风格
+const AVATAR_POOL = [
+  // 像素人像（以 cyberName 为动态种子，此处用占位符 __NAME__）
+  { seed: '__NAME__', label: '身份像', icon: '👤' },
+  // 物件头像
+  { seed: 'mini-red-umbrella-2000', label: '小雨伞', icon: '☂️' },
+  { seed: 'cactus-pixel-verde', label: '仙人掌', icon: '🌵' },
+  { seed: 'retro-computer-9x-boot', label: '小电脑', icon: '💻' },
+  { seed: 'floppy-disk-cyber-wave', label: '磁碟片', icon: '💾' },
+  { seed: 'gameboy-neon-blink-99', label: '游戏机', icon: '🎮' },
+  { seed: 'satellite-orbit-signal', label: '卫星锅', icon: '📡' },
+  { seed: 'coffee-mug-terminal-hot', label: '咖啡杯', icon: '☕' },
+  { seed: 'alien-capsule-static', label: '外星舱', icon: '🛸' },
+  { seed: 'cassette-tape-rewind88', label: '磁带机', icon: '📼' },
+  { seed: 'pixel-robot-unit-zero', label: '机器人', icon: '🤖' },
+]
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -12,11 +31,24 @@ function App() {
   const [noisePhase, setNoisePhase] = useState(0)
   const [chatHeight, setChatHeight] = useState('60vh')
   const [loginSeq, setLoginSeq] = useState(0)
+  const [avatarIdx, setAvatarIdx] = useState(() => {
+    const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
+    return saved ? Number(saved) : 0
+  })
   const headerRef = useRef<HTMLElement>(null)
   const navigate = useNavigate()
 
-  const avatarSeed = cyberName ?? 'midnight'
+  const currentAvatarEntry = AVATAR_POOL[avatarIdx] ?? AVATAR_POOL[0]
+  const avatarSeed = currentAvatarEntry.seed === '__NAME__'
+    ? (cyberName ?? 'midnight')
+    : currentAvatarEntry.seed
   const avatarUrl = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`
+
+  const cycleAvatar = () => {
+    const next = (avatarIdx + 1) % AVATAR_POOL.length
+    setAvatarIdx(next)
+    window.localStorage.setItem(AVATAR_STORAGE_KEY, String(next))
+  }
 
   // 动态计算聊天区精确高度：视口高度 - header高度 - container上下padding - gap
   useEffect(() => {
@@ -64,6 +96,8 @@ function App() {
     window.localStorage.removeItem('cyber_name')
     setIsLoggedIn(false)
     setCyberName(null)
+    // loginSeq +1 触发 RoomChat effect 重跑，读取 token 为空进入 offline 分支，关闭 WS
+    setLoginSeq((n) => n + 1)
     navigate(`/chat/${DEFAULT_ROOM_ID}`, { replace: true })
   }
 
@@ -99,6 +133,9 @@ function App() {
                         <br />
                         {cyberName ?? 'ANON'}
                       </div>
+                      <button type="button" className="user-menu-item" onClick={cycleAvatar}>
+                        {`切换头像 ${currentAvatarEntry.icon} ${currentAvatarEntry.label} [${avatarIdx + 1}/${AVATAR_POOL.length}]`}
+                      </button>
                       <button type="button" className="user-menu-item" onClick={logout}>
                         {'终止当前进程 (Terminate PID)'}
                       </button>
