@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CHAT_WS_BASE_URL, HTTP_BASE_URL } from '../config/api'
 
 type IncomingMessage =
@@ -99,6 +99,7 @@ function RoomMessageLine({ msg, isHistory }: RoomMessageLineProps) {
 
 export function RoomChat({ embedded = false }: RoomChatProps) {
   const { room_id } = useParams<{ room_id: string }>()
+  const navigate = useNavigate()
   const roomId = useMemo(() => {
     if (!room_id?.trim()) return PRESET_SECTORS[0].id
     return room_id.trim()
@@ -327,10 +328,8 @@ export function RoomChat({ embedded = false }: RoomChatProps) {
     const targetPath = `/chat/${targetRoomId}`
     if (switchNavTimerRef.current) window.clearTimeout(switchNavTimerRef.current)
     switchNavTimerRef.current = window.setTimeout(() => {
-      if (window.location.pathname !== targetPath) {
-        // 直接走浏览器原生导航，和手动输入 URL 行为一致，确保必然切房。
-        window.location.assign(targetPath)
-      }
+      // 使用 React Router navigate，basename 会自动补全 /cyber-chat 前缀
+      navigate(targetPath)
       setChaosFx(false)
     }, 600)
   }

@@ -24,8 +24,10 @@ services:
     ports:
       - "20001:80"
     volumes:
-      # 【关键修改】将前端挂载到容器内部的 /cyber-chat 目录下
+      # 静态文件挂载到 /cyber-chat 子目录，与 vite base 路径对齐
       - ./frontend/dist:/usr/share/nginx/html/cyber-chat
+      # 自定义 nginx 配置，处理 SPA fallback
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
     deploy:
       resources:
         limits:
