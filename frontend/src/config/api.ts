@@ -1,14 +1,20 @@
 const hostname = window.location.hostname
 const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1'
 
-// 统一跟随当前访问主机，避免手机/局域网/主机名访问时回落到 localhost。
-const backendHost = isLocalHost ? 'localhost' : hostname
+let HTTP_BASE_URL: string
+let WS_BASE_URL: string
 
-const httpProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
-const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+if (isLocalHost) {
+  // 本地开发：直连后端开发服务器端口
+  HTTP_BASE_URL = 'http://localhost:8000'
+  WS_BASE_URL = 'ws://localhost:8000'
+} else {
+  // 生产环境：经由 Nginx 子路径网关转发
+  HTTP_BASE_URL = 'https://dothings.one/cyber-api'
+  WS_BASE_URL = 'wss://dothings.one/cyber-api'
+}
 
-export const HTTP_BASE_URL = `${httpProtocol}://${backendHost}:8000`
-export const WS_BASE_URL = `${wsProtocol}://${backendHost}:8000`
+export { HTTP_BASE_URL, WS_BASE_URL }
 
 export const API_AUTH_URL = `${HTTP_BASE_URL}/api/auth`
 export const CHAT_WS_BASE_URL = `${WS_BASE_URL}/api/ws`
