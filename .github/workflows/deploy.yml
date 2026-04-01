@@ -1,0 +1,47 @@
+name: 2000.exe Cyber Deploy
+
+on:
+  push:
+    branches:
+      - main # 当你 push 代码到 main 分支时自动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. 检出代码
+      uses: actions/checkout@v3
+
+    - name: 2. 设置 Node.js 环境 (利用 GitHub 的服务器)
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: 3. 构建前端静态文件
+      run: |
+        cd frontend
+        npm install
+        npm run build
+        # 构建完成后，生成的静态文件都在 frontend/dist 目录下
+
+    - name: 4. 通过 SCP 将代码推送到你的云服务器
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "backend/,frontend/dist/,docker-compose.yml" # 只传这三个核心目录/文件
+        target: "/home/ubuntu/cyber-chat" # 你服务器上的项目目录
+
+    - name: 5. SSH 登录服务器并重启 Docker 容器
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /home/ubuntu/2000-exe
+          docker-compose down
+          docker-compose up -d --build backend # 只重新 build 后端镜像
+          docker-compose restart frontend # 重启 nginx 加载新的前端静态文件

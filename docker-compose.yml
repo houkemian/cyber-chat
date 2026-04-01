@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      # 【核心保命配置】将宿主机的数据卷挂载到容器的 /app/data 目录
+      # 你的代码里，数据库路径必须写成 /app/data/cyber_chat.db
+      - sqlite_data:/app/data  
+    environment:
+      - DATABASE_URL=sqlite:////app/data/cyber_chat.db
+      - ENV=production
+    deploy:
+      resources:
+        limits:
+          memory: 300M # 内存足够，给后端多留点余量
+
+  frontend:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
+      # - ./nginx.conf:/etc/nginx/conf.d/default.conf # 如果需要配置反向代理可以挂载这个
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+
+# 声明持久化数据卷
+volumes:
+  sqlite_data:
