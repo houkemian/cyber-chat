@@ -43,5 +43,4 @@ jobs:
         script: |
           cd /home/ubuntu/cyber-chat
           docker compose down
-          docker compose up -d --build backend # 只重新 build 后端镜像
-          docker compose restart frontend # 重启 nginx 加载新的前端静态文件
+          docker compose up -d --build
