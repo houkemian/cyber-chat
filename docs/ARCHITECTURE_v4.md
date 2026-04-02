@@ -83,10 +83,13 @@
 | ~~P1~~ | ~~成员列表 API 化~~ | **已实现**：`GET /api/ws/rooms/{room_id}/members` |
 | P1 | WS 心跳保活 | 客户端 ping / 服务端 pong，防 Nginx 长连接超时 |
 | P1 | AI 气氛组 Agent | `/backend/services/ai_agent.py`，与主鉴权链路隔离 |
+| P1 | 分区人格 LLM Agent | `backend/services/llm_agent.py`：`reply`→chat，`action`→system；带记忆折叠、超时/重试/熔断、单房间锁 |
 | P1 | 内容安全拦截 | 填充 `content_moderation`，接入风控或关键词 |
 | P2 | 历史消息分页 | `before_timestamp` / `cursor` |
 | P2 | 消息去重 | 切房时历史与 WS 重叠：`timestamp+sender+content` |
 | P2 | PWA / 离线缓存 | Service Worker |
+| P2 | 天气系统 | 房间内的机器人设定物理位置，可查询天气，根据天气触发消息 |
+| P2 | Tool Calls | 在前端引入可扩展的“工具调用”通道（结构化 JSON），允许 Agent 触发 UI/环境动作（不阻塞主链路） |
 
 ---
 

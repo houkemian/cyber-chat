@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -31,8 +30,7 @@ cache_manager = CacheManager(settings=settings)
 
 # ── CORS ────────────────────────────────────────────────────
 # 开发阶段放行本地 Vite 前端；生产环境通过 CORS_ORIGINS 环境变量注入
-_raw_origins = os.getenv("CORS_ORIGINS", "")
-cors_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] or [
+cors_origins = settings.cors_origins or [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]

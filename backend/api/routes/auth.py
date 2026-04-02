@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from core.settings import get_settings
 from schemas.auth import AuthResponse, SendKeyRequest, VerifyKeyRequest
 from utils.generator import generate_cyber_name
 from utils.security import create_access_token
@@ -81,7 +81,7 @@ async def verify(
                 cyber_name = generated_name
 
     # 从环境变量读取签名密钥；开发环境有默认值，生产环境务必设置 JWT_SECRET
-    secret_key = os.getenv("JWT_SECRET", "dev-secret-change-me-in-prod")
+    secret_key = get_settings().jwt_secret
 
     token = create_access_token(
         secret_key=secret_key,

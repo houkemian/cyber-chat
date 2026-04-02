@@ -2,9 +2,14 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CHAT_WS_BASE_URL, HTTP_BASE_URL } from '../config/api'
+import { CHAT_RATE_LIMIT } from '../config/chat'
 
 /** 与后端房间历史 deque 上限一致：本地列表最多保留最近 N 条 */
 const MAX_ROOM_MESSAGES = 200
+const WS_RETRY_MAX = 2
+const WS_RETRY_DELAY_MS = 450
+const WS_HANDSHAKE_TIMEOUT_MS = 2500
+const HISTORY_SYNC_TIMEOUT_MS = 4000
 
 type IncomingMessage =
   | {
@@ -49,9 +54,16 @@ interface RoomChatProps {
 const PRESET_SECTORS = [
   { id: 'sector-001', name: '午夜心碎俱乐部' },
   { id: 'sector-404', name: '赛博酒保' },
-  { id: 'sector-777', name: '黑客帝国' },
+  { id: 'sector-777', name: '废弃数据中心' },
   { id: 'sector-999', name: '星空物语' },
 ]
+
+const ROOM_THEME_MAP: Record<string, 'heartbreak' | 'bartender' | 'datacenter' | 'starry'> = {
+  'sector-001': 'heartbreak',
+  'sector-404': 'bartender',
+  'sector-777': 'datacenter',
+  'sector-999': 'starry',
+}
 
 // ── 公告：默认由 GET /api/announcements 下发；请求失败时使用此兜底 ──
 type AnnouncementItem = { id: string; content: string }
@@ -161,9 +173,7 @@ function toClock(iso: string): string {
 }
 
 function roomTheme(roomId: string): string {
-  if (roomId.includes('001')) return 'border-cyan-400/60 shadow-[0_0_20px_rgba(34,211,238,0.2)]'
-  if (roomId.includes('404')) return 'border-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.2)]'
-  return 'border-fuchsia-400/60 shadow-[0_0_20px_rgba(217,70,239,0.22)]'
+  return ROOM_THEME_MAP[roomId] ?? 'starry'
 }
 
 interface RoomMessageLineProps {
@@ -212,7 +222,7 @@ function RoomMessageLine({ msg, isHistory, index = 0 }: RoomMessageLineProps) {
       } ${isOdd ? 'msg-row-odd' : 'msg-row-even'}`}
     >
       <p className="msg-inline-line">
-        <span className={`msg-sender ${isOdd ? 'text-fuchsia-300' : 'text-cyan-400'}`}>
+        <span className={`msg-sender ${isOdd ? 'msg-sender-odd' : 'msg-sender-even'}`}>
           {msg.sender ?? 'ANON'}
         </span>
         <span className="msg-time-inline">[{toClock(msg.timestamp)}]</span>
@@ -397,6 +407,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
     () => PRESET_SECTORS.find((sector) => sector.id === roomId),
     [roomId],
   )
+  const themeName = useMemo(() => roomTheme(roomId), [roomId])
   const roomName = currentSector?.name ?? roomId
 
   const resolvedCyberName = useMemo(
@@ -410,6 +421,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
   const userListRef = useRef<HTMLDivElement>(null)
   const switchNavTimerRef = useRef<number | null>(null)
   const historySyncTimerRef = useRef<number | null>(null)
+  const sendTimestampsRef = useRef<number[]>([])
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [rawHistory, setRawHistory] = useState<ChatMessage[]>([])
@@ -472,6 +484,14 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
   }, [messages.length])
 
   useEffect(() => {
+    const html = document.documentElement
+    html.setAttribute('data-theme', themeName)
+    return () => {
+      html.removeAttribute('data-theme')
+    }
+  }, [themeName])
+
+  useEffect(() => {
     const token = window.localStorage.getItem('cyber_token')
     if (!token) {
       setChannelState('offline')
@@ -505,16 +525,30 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
     const seq = ++wsSeqRef.current
     const abortController = new AbortController()
 
-    const openRealtimeLink = () => {
+    let reconnectTimer: number | null = null
+    let handshakeTimer: number | null = null
+    let disposed = false
+
+    const openRealtimeLink = (attempt = 0) => {
       if (seq !== wsSeqRef.current) return
 
       const ws = new WebSocket(
         `${CHAT_WS_BASE_URL}/${encodeURIComponent(roomId)}?token=${encodeURIComponent(token)}`,
       )
       wsRef.current = ws
+      handshakeTimer = window.setTimeout(() => {
+        if (seq !== wsSeqRef.current || disposed) return
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.close(4000, 'handshake-timeout')
+        }
+      }, WS_HANDSHAKE_TIMEOUT_MS)
 
       ws.onopen = () => {
         if (seq !== wsSeqRef.current) return
+        if (handshakeTimer != null) {
+          window.clearTimeout(handshakeTimer)
+          handshakeTimer = null
+        }
         setChannelState('online')
       }
 
@@ -585,9 +619,30 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
         setChannelState('offline')
       }
 
-      ws.onclose = () => {
+      ws.onclose = (evt) => {
         if (seq !== wsSeqRef.current) return
+        if (disposed) return
+        if (handshakeTimer != null) {
+          window.clearTimeout(handshakeTimer)
+          handshakeTimer = null
+        }
         setChannelState('offline')
+        if (attempt >= WS_RETRY_MAX) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `sys-ws-close-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              type: 'system',
+              systemKind: 'generic',
+              content: `[系统提示] 链路断开(code=${evt.code})，请稍后重试或重新接入。`,
+              timestamp: new Date().toISOString(),
+            },
+          ])
+          return
+        }
+        reconnectTimer = window.setTimeout(() => {
+          openRealtimeLink(attempt + 1)
+        }, WS_RETRY_DELAY_MS)
       }
     }
 
@@ -599,6 +654,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
           {
             params: { limit: MAX_ROOM_MESSAGES },
             signal: abortController.signal,
+            timeout: HISTORY_SYNC_TIMEOUT_MS,
           },
         )
 
@@ -615,6 +671,16 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
         }))
       } catch {
         if (seq !== wsSeqRef.current) return
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-history-failed-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            type: 'system',
+            systemKind: 'generic',
+            content: '[系统提示] 历史同步失败，已切换至实时链路重试。',
+            timestamp: new Date().toISOString(),
+          },
+        ])
       }
 
       if (seq !== wsSeqRef.current) return
@@ -675,7 +741,16 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
     void syncHistoryThenConnect()
 
     return () => {
+      disposed = true
       abortController.abort()
+      if (handshakeTimer != null) {
+        window.clearTimeout(handshakeTimer)
+        handshakeTimer = null
+      }
+      if (reconnectTimer != null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
       if (historySyncTimerRef.current) {
         window.clearInterval(historySyncTimerRef.current)
         historySyncTimerRef.current = null
@@ -764,6 +839,23 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
     }
 
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    const now = Date.now()
+    const recent = sendTimestampsRef.current.filter((ts) => now - ts < CHAT_RATE_LIMIT.windowMs)
+    if (recent.length >= CHAT_RATE_LIMIT.maxSendsPerSecond) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `sys-rate-limit-${now}-${Math.random().toString(16).slice(2)}`,
+          type: 'system',
+          systemKind: 'generic',
+          content: '[系统提示] 发送过快：每位用户每秒最多发送 2 条消息。',
+          timestamp: new Date().toISOString(),
+        },
+      ])
+      return
+    }
+    recent.push(now)
+    sendTimestampsRef.current = recent
     wsRef.current.send(content)
     setDraft('')
   }
@@ -790,7 +882,11 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
   }, [])
 
   return (
-    <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div
+      className="page room-chat-page"
+      data-theme={themeName}
+      style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className={`border-2 border-t-white border-l-white border-r-gray-700 border-b-gray-700 bg-[#bdbdbd] p-[3px] ${embedded ? '' : 'shadow-[8px_8px_0_#1c1c1c]'}`}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }} className={`global-chat-grain border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white bg-[#090910]`}>
 
@@ -813,7 +909,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
           {/* ── 三区主体（flex 竖排）── */}
           <div
             style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px', gap: '6px' }}
-            className={`border-l-2 border-r-2 font-mono text-[13px] leading-relaxed ${roomTheme(roomId)}`}
+            className="room-theme-frame border-l-2 border-r-2 font-mono text-[13px] leading-relaxed"
           >
             {/* 公告区 BROADCAST://SIGNAL 12% */}
             <div style={{ flex: '0 0 12%', minHeight: '60px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -821,7 +917,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
             </div>
 
             {/* 系统消息区 SYS://FEED 18% */}
-            <div style={{ flex: '0 0 18%', minHeight: '60px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="border border-amber-300/35 bg-[#15100b]/65">
+            <div style={{ flex: '0 0 18%', minHeight: '60px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="room-sys-panel border">
               <div className="panel-header-sys">
                 <span className="dot" />
                 <span className="title">SYS<span className="sep">://</span>FEED</span>
@@ -830,7 +926,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
               </div>
               <div ref={systemListRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="space-y-1 px-2 py-2">
                 {systemMessages.length === 0 ? (
-                  <p className="text-[12px] text-amber-200/70">[系统提示] 暂无系统信号</p>
+                  <p className="room-theme-muted text-[12px]">[系统提示] 暂无系统信号</p>
                 ) : (
                   systemMessages.map((msg) => (
                     <RoomMessageLine key={msg.id} msg={msg} isHistory={Boolean(msg.isHistory)} />
@@ -840,7 +936,7 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
             </div>
 
             {/* 用户消息区 USR://STREAM，flex:1 吃剩余空间 */}
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="border border-cyan-400/35 bg-[#0b1223]/62">
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} className="room-usr-panel border">
               <div className="panel-header-usr">
                 <span className={`dot ${channelState === 'online' ? 'online' : 'offline'}`} />
                 <span className="title">USR<span className="sep">://</span>STREAM</span>
@@ -870,14 +966,14 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
 
           {/* ── 历史同步进度条 ── */}
           {isHistorySyncing && (
-            <div className="shrink-0 border-t border-[#2d2d2d] bg-[#09070f] px-3 py-2 font-mono text-[12px] text-cyan-200">
+            <div className="room-sync-panel shrink-0 border-t px-3 py-2 font-mono text-[12px]">
               <div className="mb-2 flex items-center justify-between animate-pulse">
                 <span>[ 同步中: {Math.min(syncRenderedCount, MAX_ROOM_MESSAGES)}/{MAX_ROOM_MESSAGES} ]</span>
                 <span>{rawHistory.length} buffered</span>
               </div>
-              <div className="h-2 overflow-hidden border border-cyan-400/45 bg-black/80">
+              <div className="room-sync-progress-track h-2 overflow-hidden border bg-black/80">
                 <div
-                  className="h-full bg-[linear-gradient(90deg,#00f0ff,#bc00ff,#39ff14)] transition-[width] duration-75"
+                  className="room-sync-progress-fill h-full transition-[width] duration-75"
                   style={{ width: `${Math.max(2, (Math.min(syncRenderedCount, MAX_ROOM_MESSAGES) / MAX_ROOM_MESSAGES) * 100)}%` }}
                 />
               </div>
@@ -937,11 +1033,11 @@ export function RoomChat({ embedded = false, loginSeq = 0, cyberName = null }: R
           {/* ── 切换频道遮罩 ── */}
           {channelState === 'switching' && (
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/68">
-              <div className="w-[82%] max-w-[560px] border border-cyan-400/60 bg-[#080a17]/95 p-4 font-mono text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.2)]">
+              <div className="room-switch-card w-[82%] max-w-[560px] border p-4 font-mono">
                 <p className="mb-3 text-center text-sm">
                   [ 正在切换频段至 SECTOR-{roomId} ({roomName})... ]
                 </p>
-                <div className="h-2 overflow-hidden border border-cyan-400/45 bg-black/80">
+                <div className="room-switch-progress-track h-2 overflow-hidden border bg-black/80">
                   <div className="room-switch-progress h-full w-1/2" />
                 </div>
               </div>

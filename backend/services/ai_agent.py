@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import random
 import re
 from datetime import datetime, timezone
 from typing import Any, ClassVar
 
+from core.settings import get_settings
 from utils.ws_manager import ws_manager
 
 logger = logging.getLogger("chat.cyber_poet")
@@ -17,8 +17,8 @@ _CYBER_POET_LINE_RE = re.compile(
     r"^[\u0020-\u007e\u00a0-\ufffd\u4e00-\u9fff·…—]{1,512}$",
 )
 
-# 播报身份（亦可在文案中称为「零号诗人」）
-CYBER_POET_SENDER = "SYSTEM//POET"
+# 播报身份（移除 SYSTEM//POET，统一使用中文人格名）
+CYBER_POET_SENDER = "零号诗人"
 
 
 class CyberPoet:
@@ -36,8 +36,9 @@ class CyberPoet:
         return cls._instance
 
     def _init_once(self) -> None:
-        self._interval_min_sec = float(os.getenv("CYBER_POET_INTERVAL_MIN_SEC", "20"))
-        self._interval_max_sec = float(os.getenv("CYBER_POET_INTERVAL_MAX_SEC", "30"))
+        app_settings = get_settings()
+        self._interval_min_sec = app_settings.cyber_poet_interval_min_sec
+        self._interval_max_sec = app_settings.cyber_poet_interval_max_sec
         if self._interval_min_sec <= 0 or self._interval_max_sec <= 0:
             raise ValueError("CYBER_POET interval seconds must be positive")
         if self._interval_min_sec > self._interval_max_sec:
@@ -46,12 +47,10 @@ class CyberPoet:
                 self._interval_min_sec,
             )
 
-        self._enabled = os.getenv("CYBER_POET_ENABLED", "1").strip().lower() not in (
-            "0",
-            "false",
-            "no",
-            "off",
-        )
+        self._enabled = app_settings.cyber_poet_enabled
+        # 发送速率限制：最多每秒 N 条
+        self._max_messages_per_sec = app_settings.cyber_poet_max_messages_per_sec
+        self._min_send_gap_sec = 1.0 / float(self._max_messages_per_sec)
 
         self._quotes: tuple[str, ...] = (
             "数据在尖啸，而我只是回声。",
@@ -73,6 +72,13 @@ class CyberPoet:
             if not _CYBER_POET_LINE_RE.match(q):
                 raise ValueError(f"CyberPoet quote failed line validation: {q!r}")
 
+    def _generate_poem_line(self) -> str:
+        """
+        当前版本：从本地语录池采样。
+        后续接入 LLM 时，可在此替换为模型调用并保留外层广播调度逻辑。
+        """
+        return random.choice(self._quotes)
+
     @staticmethod
     def _active_room_ids() -> list[str]:
         return [rid for rid, clients in list(ws_manager.rooms.items()) if clients]
@@ -90,13 +96,16 @@ class CyberPoet:
         rooms = self._active_room_ids()
         if not rooms:
             return
-        line = random.choice(self._quotes)
+        line = self._generate_poem_line()
         payload = self._payload(line)
-        for room_id in rooms:
+        for idx, room_id in enumerate(rooms):
             try:
                 await ws_manager.broadcast_json(payload, room_id)
             except Exception:
                 logger.exception("CyberPoet broadcast failed room_id=%s", room_id)
+            # 节流：限制全局发送速率，避免瞬时广播过快
+            if idx < len(rooms) - 1:
+                await asyncio.sleep(self._min_send_gap_sec)
 
     async def run_forever(self) -> None:
         """后台协程：随机间隔后向所有活跃扇区各推一条 chat。"""
