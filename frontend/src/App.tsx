@@ -31,7 +31,7 @@ function App() {
   const [noisePhase, setNoisePhase] = useState(0)
   const [chatHeight, setChatHeight] = useState('60vh')
   const [loginSeq, setLoginSeq] = useState(0)
-  const [avatarIdx, setAvatarIdx] = useState(() => {
+  const [avatarIdx] = useState(() => {
     const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
     return saved ? Number(saved) : 0
   })
@@ -43,12 +43,6 @@ function App() {
     ? (cyberName ?? 'midnight')
     : currentAvatarEntry.seed
   const avatarUrl = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`
-
-  const cycleAvatar = () => {
-    const next = (avatarIdx + 1) % AVATAR_POOL.length
-    setAvatarIdx(next)
-    window.localStorage.setItem(AVATAR_STORAGE_KEY, String(next))
-  }
 
   // 动态计算聊天区精确高度：视口高度 - header高度 - container上下padding - gap
   useEffect(() => {
@@ -109,7 +103,7 @@ function App() {
   }
 
   return (
-    <>
+    <div className="crt-container">
       {/* ── 主页面 ── */}
       <div className="page overflow-hidden" data-noise-phase={noisePhase}>
         <div className="fx-layer">
@@ -120,6 +114,7 @@ function App() {
         </div>
 
         <div className="container">
+          {/* 顶栏：index.css `.header`（`--header-h-scale`、右侧与 `--chat-panel-r-inset` 对齐下方三区右边界；`.header-top` 垂直居中） */}
           <header ref={headerRef} className="card header shrink-0">
             <div className="header-top">
               <div>
@@ -140,9 +135,6 @@ function App() {
                         <br />
                         {cyberName ?? 'ANON'}
                       </div>
-                      <button type="button" className="user-menu-item" onClick={cycleAvatar}>
-                        {`切换头像 ${currentAvatarEntry.icon} ${currentAvatarEntry.label} [${avatarIdx + 1}/${AVATAR_POOL.length}]`}
-                      </button>
                       <button type="button" className="user-menu-item" onClick={logout}>
                         {'终止当前进程 (Terminate PID)'}
                       </button>
@@ -168,7 +160,7 @@ function App() {
             style={{ height: chatHeight, minHeight: 0, flexShrink: 0 }}
           >
             <Routes>
-              <Route path="/chat/:room_id" element={<RoomChat embedded loginSeq={loginSeq} />} />
+              <Route path="/chat/:room_id" element={<RoomChat embedded loginSeq={loginSeq} cyberName={cyberName} />} />
               <Route path="/chat" element={<Navigate to={`/chat/${DEFAULT_ROOM_ID}`} replace />} />
               <Route path="*" element={<Navigate to={`/chat/${DEFAULT_ROOM_ID}`} replace />} />
             </Routes>
@@ -194,7 +186,7 @@ function App() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 

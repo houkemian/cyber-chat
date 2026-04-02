@@ -74,6 +74,91 @@ body {
   color: #d4d6ff;
 }
 
+/* ══════════════════════════════════════════
+   CRT 终端滤镜（根容器 .crt-container）
+   - 扫描线 + 呼吸闪烁：::before（fixed，仅动画 opacity）
+   - 暗角畸变：::after（fixed，径向渐变）
+   - 色散：:where(.crt-container *) 低特异性 text-shadow，具体组件可覆盖
+   - z-index > .radar-mask(300)，蒙层开启时仍可见；pointer-events:none 不挡交互与滚动
+   ══════════════════════════════════════════ */
+
+.crt-container {
+  position: relative;
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+/* 暗角：中间略亮、边缘压暗，模拟 CRT 弧面 */
+.crt-container::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 92% 88% at 50% 46%,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.05) 52%,
+    rgba(0, 0, 0, 0.38) 100%
+  );
+  contain: strict;
+}
+
+/* 扫描线：极细横线 + 高频低幅 opacity 闪烁（荧光粉不稳） */
+.crt-container::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 351;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 1px,
+    rgba(0, 0, 0, 0.11) 1px,
+    rgba(0, 0, 0, 0.11) 2px
+  );
+  background-size: 100% 2px;
+  animation: crt-terminal-flicker 0.04s steps(2, end) infinite;
+  opacity: 0.94;
+  will-change: opacity;
+  contain: strict;
+}
+
+@keyframes crt-terminal-flicker {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 0.97;
+  }
+}
+
+/* 色散：红/青微偏移；:where 特异性为 0，不压过 .neon-flicker 等既有阴影 */
+:where(.crt-container *) {
+  text-shadow:
+    1px 0 rgba(255, 48, 72, 0.2),
+    -1px 0 rgba(0, 240, 255, 0.17);
+}
+
+.crt-container img,
+.crt-container svg,
+.crt-container canvas,
+.crt-container video {
+  text-shadow: none;
+}
+
+/* 主标题：合并色散与原有霓虹 */
+.crt-container .neon-flicker {
+  text-shadow:
+    1px 0 rgba(255, 48, 72, 0.24),
+    -1px 0 rgba(0, 240, 255, 0.2),
+    0 0 8px rgba(244, 114, 182, 0.5),
+    0 0 20px rgba(217, 70, 239, 0.45);
+}
+
 .fx-layer {
   pointer-events: none;
   position: fixed;
@@ -131,6 +216,8 @@ body {
 }
 
 .container {
+  /* 与 RoomChat 三区容器右边界对齐：.chat 内边距 + 灰外框 p-[3px] + grain border-2 + 三区 border-r-2 */
+  --chat-panel-r-inset: calc(14px + 3px + 2px + 2px);
   position: relative;
   z-index: 1;
   max-width: 1080px;
@@ -156,14 +243,28 @@ body {
 }
 
 .header {
-  padding: 16px;
+  /* 顶栏整体高度约为原先的 ~82.5%（介于 80%–85%）；子元素用同一系数 */
+  --header-h-scale: 0.825;
+  padding-top: calc(16px * var(--header-h-scale));
+  padding-bottom: calc(16px * var(--header-h-scale));
+  padding-left: calc(16px * var(--header-h-scale));
+  /* 头像右缘与下方公告/系统/用户区公共右边框对齐（继承 --chat-panel-r-inset） */
+  padding-right: var(--chat-panel-r-inset);
 }
 
 .header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: calc(12px * var(--header-h-scale));
+}
+
+.header-top > div:first-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(6px * var(--header-h-scale));
+  min-height: 0;
 }
 
 .tag {
@@ -173,10 +274,19 @@ body {
   color: rgba(165, 243, 252, 0.88);
 }
 
+.header .tag {
+  font-size: calc(12px * var(--header-h-scale));
+}
+
 .title {
   margin: 8px 0 0;
   font-size: 32px;
   color: #f5d0fe;
+}
+
+.header h1.title {
+  margin: 0;
+  font-size: calc(32px * var(--header-h-scale));
 }
 
 .neon-flicker {
@@ -314,6 +424,11 @@ body {
     0 0 10px rgba(0, 255, 255, 0.4);
 }
 
+.header .auth-btn-teleport {
+  padding: calc(7px * var(--header-h-scale)) calc(14px * var(--header-h-scale));
+  font-size: calc(11px * var(--header-h-scale));
+}
+
 /* 常态：粉蓝发光切换 */
 @keyframes teleport-idle {
   0%, 100% {
@@ -400,6 +515,11 @@ body {
   border: 1px solid rgba(0, 240, 255, 0.32);
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.24);
   background: rgba(17, 21, 45, 0.8);
+}
+
+.header .user-avatar {
+  width: calc(40px * var(--header-h-scale));
+  height: calc(40px * var(--header-h-scale));
 }
 
 .chat {
@@ -934,6 +1054,11 @@ body {
     0 0 8px rgba(0, 240, 255, 0.34),
     0 0 20px rgba(188, 0, 255, 0.28);
   animation: avatar-halo-jitter 1.25s steps(2, end) infinite;
+}
+
+.header .user-avatar-shell {
+  width: calc(40px * var(--header-h-scale));
+  height: calc(40px * var(--header-h-scale));
 }
 
 .avatar-crt-mask,
@@ -2775,8 +2900,9 @@ body {
    ══════════════════════════════════════════ */
 
 .cmd-input-offline {
-  color: rgba(57, 255, 20, 0.28) !important;
-  caret-color: transparent !important;
+  color: rgba(57, 255, 20, 0.38) !important;
+  /* 链路断开时仍允许输入 CFS 伪指令，需可见光标 */
+  caret-color: rgba(57, 255, 20, 0.65) !important;
 }
 
 .cmd-input-offline::placeholder {
@@ -2806,12 +2932,14 @@ body {
   }
 
   .header {
-    padding: 7px 10px;
+    padding-top: calc(7px * var(--header-h-scale));
+    padding-bottom: calc(7px * var(--header-h-scale));
+    padding-left: calc(10px * var(--header-h-scale));
+    padding-right: var(--chat-panel-r-inset);
   }
 
   .header-top {
-    align-items: center;
-    gap: 8px;
+    gap: calc(8px * var(--header-h-scale));
   }
 
   .tag {
@@ -2823,9 +2951,18 @@ body {
     font-size: 20px;
   }
 
+  .header h1.title {
+    font-size: calc(20px * var(--header-h-scale));
+  }
+
   .user-avatar {
     width: 32px;
     height: 32px;
+  }
+
+  .header .user-avatar {
+    width: calc(32px * var(--header-h-scale));
+    height: calc(32px * var(--header-h-scale));
   }
 
   .user-avatar-shell {
@@ -2833,9 +2970,19 @@ body {
     height: 32px;
   }
 
+  .header .user-avatar-shell {
+    width: calc(32px * var(--header-h-scale));
+    height: calc(32px * var(--header-h-scale));
+  }
+
   .auth-btn-teleport {
     font-size: 10px;
     padding: 5px 10px;
+  }
+
+  .header .auth-btn-teleport {
+    font-size: calc(10px * var(--header-h-scale));
+    padding: calc(5px * var(--header-h-scale)) calc(10px * var(--header-h-scale));
   }
 
   /* 聊天区圆角稍微压缩 */
@@ -2849,13 +2996,210 @@ body {
     font-size: 17px;
   }
 
+  .header h1.title {
+    font-size: calc(17px * var(--header-h-scale));
+  }
+
   .user-avatar {
     width: 28px;
     height: 28px;
   }
 
+  .header .user-avatar {
+    width: calc(28px * var(--header-h-scale));
+    height: calc(28px * var(--header-h-scale));
+  }
+
   .user-avatar-shell {
     width: 28px;
     height: 28px;
+  }
+
+  .header .user-avatar-shell {
+    width: calc(28px * var(--header-h-scale));
+    height: calc(28px * var(--header-h-scale));
+  }
+}
+
+/* ══════════════════════════════════════════
+   Cyber File System（CFS）· 系统区多行块 + 擦除蒙层
+   ══════════════════════════════════════════ */
+
+.global-chat-system-cfs {
+  margin: 0 0 6px;
+  padding: 5px 6px 6px;
+  border-left: 2px solid rgba(34, 211, 238, 0.5);
+  background: linear-gradient(135deg, rgba(8, 22, 38, 0.72), rgba(12, 8, 24, 0.55));
+  box-shadow: inset 0 0 14px rgba(0, 240, 255, 0.06);
+}
+
+.sys-cfs-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.sys-cfs-tag {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(34, 211, 238, 0.9);
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+}
+
+.sys-cfs-pre {
+  margin: 0;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1.38;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Courier New", Consolas, monospace;
+  color: rgba(253, 230, 138, 0.9);
+  text-shadow: 0 0 5px rgba(253, 230, 138, 0.12);
+  max-height: min(38vh, 220px);
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.cfs-wipe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #020208;
+  pointer-events: auto;
+  animation: cfs-wipe-bg-pulse 2s ease-in-out forwards;
+}
+
+.cfs-wipe-aged {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(188, 0, 255, 0.12), transparent 55%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.04) 0px,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  pointer-events: none;
+}
+
+.cfs-wipe-noise {
+  position: absolute;
+  inset: -5%;
+  opacity: 0.42;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
+  filter: contrast(160%) saturate(140%);
+  animation: cfs-wipe-noise-shift 2s steps(3, end) forwards;
+  pointer-events: none;
+}
+
+.cfs-wipe-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22%;
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(57, 255, 20, 0.08) 40%,
+    rgba(0, 240, 255, 0.35) 50%,
+    rgba(57, 255, 20, 0.08) 60%,
+    transparent 100%
+  );
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.25);
+  animation: cfs-wipe-beam 2s cubic-bezier(0.33, 0.12, 0.2, 1) forwards;
+  pointer-events: none;
+}
+
+.cfs-wipe-text {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding: 0 12px;
+  font-family: "Courier New", Consolas, monospace;
+  font-size: clamp(11px, 2.8vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-align: center;
+  color: #ecfdf5;
+  text-shadow:
+    -2px 0 rgba(255, 60, 60, 0.85),
+    2px 0 rgba(0, 240, 255, 0.85),
+    0 0 18px rgba(255, 255, 255, 0.45);
+  animation: cfs-wipe-text-glitch 2s steps(2, end) forwards;
+}
+
+@keyframes cfs-wipe-bg-pulse {
+  0% {
+    filter: brightness(1);
+  }
+  15% {
+    filter: brightness(1.35);
+  }
+  40% {
+    filter: brightness(0.75);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@keyframes cfs-wipe-beam {
+  0% {
+    top: -5%;
+    opacity: 0.95;
+  }
+  100% {
+    top: 105%;
+    opacity: 0.15;
+  }
+}
+
+@keyframes cfs-wipe-noise-shift {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-3px, 2px) scale(1.02);
+    opacity: 0.65;
+  }
+  100% {
+    transform: translate(2px, -1px) scale(1);
+    opacity: 0.35;
+  }
+}
+
+@keyframes cfs-wipe-text-glitch {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  12%,
+  18% {
+    opacity: 0;
+    transform: translateX(-3px);
+  }
+  24% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  40%,
+  46% {
+    opacity: 0.4;
+  }
+  55% {
+    opacity: 1;
   }
 }

@@ -27,6 +27,8 @@ class ConnectionManager:
         self._room_locks: dict[str, asyncio.Lock] = {}
         self._locks_guard = asyncio.Lock()
         self._redis = None
+        # id(WebSocket) -> cyber_name，用于成员 API 与去重在线人数
+        self._ws_cyber_names: dict[int, str] = {}
 
     async def configure_redis(self, dsn: str) -> None:
         """初始化 Redis 客户端（失败时自动降级内存缓存）。"""
@@ -111,11 +113,31 @@ class ConnectionManager:
                 return []
             return [item for item in list(room_history)[-effective_limit:] if item.get("type") == "chat"]
 
-    def get_room_count(self, room_id: str) -> int:
-        """返回指定房间当前在线连接数。"""
-        return len(self.rooms.get(room_id, []))
+    def _unique_names_for_connections(self, connections: list[WebSocket]) -> list[str]:
+        """同一 cyber_name 多连接只保留一条，顺序为连接池遍历顺序。"""
+        seen: dict[str, None] = {}
+        ordered: list[str] = []
+        for ws in connections:
+            name = self._ws_cyber_names.get(id(ws))
+            if not name:
+                continue
+            if name not in seen:
+                seen[name] = None
+                ordered.append(name)
+        return ordered
 
-    async def connect(self, websocket: WebSocket, room_id: str) -> None:
+    def get_room_count(self, room_id: str) -> int:
+        """返回指定房间当前「去重后」在线人数（与成员 API 长度一致）。"""
+        return len(self._unique_names_for_connections(list(self.rooms.get(room_id, []))))
+
+    async def get_room_members(self, room_id: str) -> list[str]:
+        """当前房间所有连接对应的 cyber_name，已去重。"""
+        room_lock = await self._get_room_lock(room_id)
+        async with room_lock:
+            conns = list(self.rooms.get(room_id, []))
+        return self._unique_names_for_connections(conns)
+
+    async def connect(self, websocket: WebSocket, room_id: str, cyber_name: str | None = None) -> None:
         """接入上行链路并登记到指定扇区连接池。"""
         await websocket.accept()
         room_lock = await self._get_room_lock(room_id)
@@ -123,9 +145,12 @@ class ConnectionManager:
             if room_id not in self.rooms:
                 self.rooms[room_id] = []
             self.rooms[room_id].append(websocket)
+            if cyber_name and cyber_name.strip():
+                self._ws_cyber_names[id(websocket)] = cyber_name.strip()
 
     async def disconnect(self, websocket: WebSocket, room_id: str) -> None:
         """终止上行链路并移出指定扇区连接池。"""
+        self._ws_cyber_names.pop(id(websocket), None)
         room_lock = await self._get_room_lock(room_id)
         async with room_lock:
             room_connections = self.rooms.get(room_id)

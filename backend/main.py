@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.routes.announcements import router as announcements_router
 from api.routes.auth import router as auth_router
 from api.routes.chat import router as chat_router
 from cache.manager import CacheManager
 from core.settings import AppSettings
 from db.manager import DatabaseManager
+from services.ai_agent import get_cyber_poet
 from utils.ws_manager import ws_manager
 
 # ── 环境变量加载 ─────────────────────────────────────────────
@@ -48,6 +51,7 @@ app.add_middleware(
 # ── 路由挂载 ────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(announcements_router, prefix="/api")
 
 
 # ── 基础设施生命周期 ─────────────────────────────────────────
@@ -62,11 +66,22 @@ async def startup_infra() -> None:
     await ws_manager.configure_redis(settings.redis_dsn)
     app.state.db = db_manager
     app.state.cache = cache_manager
+    app.state.cyber_poet_task = asyncio.create_task(
+        get_cyber_poet().run_forever(),
+        name="cyber_poet",
+    )
 
 
 @app.on_event("shutdown")
 async def shutdown_infra() -> None:
     """停止时释放基础设施连接。"""
+    task = getattr(app.state, "cyber_poet_task", None)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     await ws_manager.close()
     await cache_manager.disconnect()
     await db_manager.disconnect()

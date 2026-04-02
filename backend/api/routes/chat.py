@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import jwt
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketException, status
 
-from models import RoomHistoryMessage
+from models import RoomHistoryMessage, RoomMembersResponse
 from utils.ws_manager import ws_manager
 
 router = APIRouter(tags=["chat"])
@@ -79,7 +79,7 @@ async def chat_ws(websocket: WebSocket, room_id: str) -> None:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
     cyber_name = _parse_cyber_name(token)
-    await ws_manager.connect(websocket, room)
+    await ws_manager.connect(websocket, room, cyber_name)
 
     await ws_manager.broadcast_json(
         {
@@ -133,6 +133,17 @@ async def chat_ws(websocket: WebSocket, room_id: str) -> None:
             },
             room,
         )
+
+
+@router.get("/ws/rooms/{room_id}/members", response_model=RoomMembersResponse)
+async def room_members(room_id: str) -> RoomMembersResponse:
+    """
+    当前扇区在线成员列表（来源于连接池，cyber_name 去重）：
+    与 WS 广播中的 online_count（去重人数）一致。
+    """
+    room = _normalize_room_id(room_id)
+    members = await ws_manager.get_room_members(room)
+    return RoomMembersResponse(members=members, online_count=len(members))
 
 
 @router.get("/chat/history/{room_id}", response_model=list[RoomHistoryMessage])
