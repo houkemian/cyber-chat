@@ -27,9 +27,39 @@
 - 接入：`connect` → 广播系统消息 `[系统]: 终端 <name> 已接入扇区 <room>。`（前端 `WS_JOIN_RE`）。
 - 循环：`receive_text` → 审核占位 → 广播 `{type, sender, content, timestamp}` → 异步写库（失败不阻断）。
 - 断开：`disconnect` → 广播 `终端 <name> 已断开扇区 <room>`（前端 `WS_LEAVE_RE`）。
+- 异常兜底：对“底层已断链但未抛 `WebSocketDisconnect`”场景做 `RuntimeError` 归一化处理，避免 ASGI 异常导致前端 `1006` 反复重连。
 - **HTTP** `GET /api/ws/rooms/{room_id}/members` → `{ members, online_count }`。
 
 **系统消息格式**与 `RoomChat.tsx` 中正则强耦合；成员展示以 **GET members** 为权威，WS 仅增量与 reconcile。
+
+---
+
+## 1.5 后端：LLM Agent（Phase-4）
+
+**`backend/services/llm_agent.py`**
+
+- 房间人格：`ROOM_PERSONALITIES[room_id]`（bot_name + system_prompt）。
+- 触发：`@AI` 强制触发，或 `LLM_AGENT_TRIGGER_PROBABILITY` 概率触发。
+- 输出协议：模型返回 JSON：`{"reply":"...","action":"..."}`。
+- 分路广播：
+  - `reply` → `type: "chat"`（进入 `USR://STREAM`）
+  - `action` → `type: "system"`（`[系统]：...`，进入 `SYS://FEED`）
+
+**MemoryManager（上下文控膨胀）**
+
+- Level 1 噪声过滤：去除 `system`，去除长度 `<2` 且不含 `@` 的消息。
+- Level 2 折叠：有效消息超过 15 条时摘要压缩为 `room_summaries[room_id]`。
+- 组装模型上下文顺序：
+  1) System Prompt  
+  2) Memory Block（远古记忆）  
+  3) Recent Context（过滤后近 3-5 条）
+
+**韧性策略**
+
+- 请求超时：`asyncio.wait_for`
+- 重试：生成/摘要分别独立重试
+- 熔断：生成/摘要分别计数与冷却窗口
+- 并发：单房间 `asyncio.Lock`，避免并发重复折叠/重复生成
 
 ---
 
@@ -66,13 +96,20 @@
 - `systemListRef` / `userListRef`：滚底。
 - `historySyncTimerRef`：历史 50ms 批量渲染。
 - `switchNavTimerRef`：切房动画后 `navigate`。
+- `sendTimestampsRef`：发送限流窗口（每用户每秒最多 2 条）。
 
 **流程（有 token）**
 
-1. `setMessages([])`，`syncHistoryThenConnect`：`GET /api/chat/history/{room_id}?limit=200`。
+1. `setMessages([])`，`syncHistoryThenConnect`：`GET /api/chat/history/{room_id}?limit=200`（带 timeout）。
 2. 流式 `setInterval` 批量 `append` 历史；结束后 `openRealtimeLink` → `WebSocket`。
 3. `onmessage`：解析 JSON → 追加 `chat` / `system`；system 可带 `online_count` 更新人数与成员启发式。
 4. 发送：`handleSend` → CFS 指令本地处理；否则 `ws.send` 文本。
+
+**连接可靠性（Phase-4）**
+
+- WS 握手 watchdog：连接长时间 `CONNECTING` 会主动 close 并触发重试。
+- 切房重连：失败后短延迟重试若干次，超限给系统提示（含 close code）。
+- 历史同步失败：显示系统提示并继续尝试实时链路，避免“静默卡住”。
 
 **切扇区**：关 WS → `chaosFx` → `navigate(/chat/:id)`，`roomId` 变化触发上述 effect 重新跑。
 

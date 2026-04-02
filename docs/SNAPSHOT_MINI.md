@@ -4,7 +4,7 @@
 
 ---
 
-## 2. 项目目录结构（全量快照）
+## 2. 项目目录结构（全量快照 · 2026-04-02）
 
 ```
 cyber_chat/
@@ -26,7 +26,14 @@ cyber_chat/
 │   │   ├── postgres_provider.py # PostgreSQL 实现（待接入）
 │   │   └── sqlite_provider.py   # SQLite 实现（当前默认）
 │   ├── schemas/
-│   │   └── auth.py              # Pydantic 请求/响应体
+│   │   ├── auth.py              # Pydantic 请求/响应体
+│   │   └── announcements.py
+│   ├── services/
+│   │   ├── ai_agent.py          # CyberPoet：20-30 分钟广播，支持速率限制
+│   │   ├── llm_agent.py         # 分区人格 LLM Agent：reply/action + MemoryManager
+│   │   └── announcements_cache.py
+│   ├── scripts/
+│   │   └── test_llm_agent_action.py  # action 分路广播模拟脚本
 │   ├── utils/
 │   │   ├── generator.py         # cyber_name 生成器
 │   │   ├── security.py          # JWT 签发/验证
@@ -46,12 +53,13 @@ cyber_chat/
 │   │   ├── components/
 │   │   │   └── SignalGlitch.tsx  # 噪点故障动画装饰组件
 │   │   ├── config/
-│   │   │   └── api.ts           # HTTP_BASE_URL / CHAT_WS_BASE_URL
+│   │   │   ├── api.ts           # HTTP_BASE_URL / CHAT_WS_BASE_URL（本地端口以该文件为准）
+│   │   │   └── chat.ts          # 每用户发送限流配置
 │   │   ├── pages/
 │   │   │   ├── LoginTerminal.tsx # 登录终端 UI
-│   │   │   └── RoomChat.tsx      # 核心聊天室（CFS、成员 API、消息列表）
+│   │   │   └── RoomChat.tsx      # 核心聊天室（主题系统、WS 重试、CFS、成员 API）
 │   │   ├── App.tsx               # 全局状态 + Header + 路由；根外包 `.crt-container`
-│   │   ├── index.css             # 全局 CSS（赛博风格 + CRT + CFS 擦除 + 顶栏对齐变量）
+│   │   ├── index.css             # 全局 CSS（多主题变量 + CRT + 雷达 + CFS）
 │   │   └── main.tsx              # React 入口
 │   ├── index.html                # viewport-fit=cover
 │   ├── nginx.conf                # 单页 SPA + gzip 配置
@@ -60,6 +68,7 @@ cyber_chat/
 ├── docs/
 │   ├── ARCHITECTURE_v1.md … v4.md
 │   ├── PROJECT_MAP.md · STYLE_GUIDE.md · LOGIC_FLOW.md · SNAPSHOT_MINI.md
+│   └── CONFIGURATION.md
 ├── .github/workflows/deploy.yml  # CI/CD
 ├── docker-compose.yml
 └── .cursorrules                   # AI 协作规范
@@ -67,7 +76,7 @@ cyber_chat/
 
 ---
 
-## 7. 布局全图（Phase-3.5，ASCII）
+## 7. 布局全图（Phase-4，ASCII）
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -76,14 +85,15 @@ cyber_chat/
 ├─────────────────────────────────────────────────────┤
 │  .chat-section（chatHeight = calc(100dvh - ...)）    │
 │  ├─ BROADCAST://SIGNAL 公告区   flex: 0 0 12%        │
-│  │    · 静态 ANNOUNCEMENTS 数组，6s 自动轮播          │
+│  │    · API 公告 + fallback，6s 自动轮播              │
 │  │    · 圆点手动切换                                  │
 │  ├─ SYS://FEED 系统消息区       flex: 0 0 18%        │
 │  │    · join(绿▶) / leave(红◀) / generic(琥珀◈)      │
+│  │    · AI action（[系统]：...）分路显示               │
 │  │    · 自动滚底 (systemListRef)                      │
 │  └─ USR://STREAM 用户消息区     flex: 1               │
 │       · 行内排版：用户名[时间]内容                    │
-│       · 奇偶行 cyan/fuchsia 双色                      │
+│       · 主题变量驱动的奇偶行配色                        │
 │       · 本地消息列表最多保留最近 200 条（与历史上限一致）│
 │       · 历史/实时分界线（DATA ECHO · 数据残响）       │
 │       · 自动滚底 (userListRef)                        │
@@ -92,6 +102,7 @@ cyber_chat/
 ├─────────────────────────────────────────────────────┤
 │  CMD PANEL（shrink:0）                               │
 │    [⊙ 44px]  > // __input (flex:1)__  [ 传输 TX ]   │
+│    · 每用户每秒最多 2 条（本地限流）                  │
 │      ↑                                    ↑          │
 │    探测图标键                          精简传输键     │
 │    (SVG 旋转指针)                                     │
@@ -105,6 +116,7 @@ cyber_chat/
 
 - `RadarScan`（`.radar-mask`，z-index: 300）
 - CRT 滤镜叠层（`.crt-container::before` / `::after`，z-index 约 349–351，`pointer-events: none`，叠在雷达之上）
+- 登录弹层（`.login-modal-mask`，z-index 1200+，避免被雷达层遮挡）
 
 **顶栏与聊天区横向对齐**：`.container` 定义 `--chat-panel-r-inset`；`.header` 的 `padding-right` 与之对齐，使头像右缘与下方三区公共右边界一致。`.header` 另含 `--header-h-scale` 压缩顶栏高度。
 
@@ -121,3 +133,5 @@ cyber_chat/
 | `GET` | `/api/chat/history/{room_id}?limit=200` | 无 | 拉取历史（最近 200 条 chat） |
 | `GET` | `/api/announcements` | 无 | 公告列表 `{ items }`，数据来自应用缓存 |
 | `GET` | `/health` | 无 | 心跳探针 |
+
+> 说明：LLM Agent 当前通过 WS 主链路旁路触发（`chat.py` 内 `create_task`），未新增公开 HTTP API。
