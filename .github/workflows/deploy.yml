@@ -32,7 +32,8 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "backend/,frontend/dist/,frontend/nginx.conf,docker-compose.yml"
-        target: "/home/ubuntu/cyber-chat" # 你服务器上的项目目录
+        # ▼ 核心修改 1：将传输目标锚定在 sysop 的专属领地 ▼
+        target: "/home/sysop/cyber-chat" 
 
     - name: 5. SSH 登录服务器并重启 Docker 容器
       uses: appleboy/ssh-action@master
@@ -41,6 +42,7 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
-          cd /home/ubuntu/cyber-chat
+          # ▼ 核心修改 2：登录后进入正确的目录 ▼
+          cd /home/sysop/cyber-chat
           docker compose down
           docker compose up -d --build

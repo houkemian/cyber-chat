@@ -82,6 +82,7 @@
 | ~~P0~~ | ~~公告 API 化~~ | **已实现**：`GET /api/announcements`，数据经 `CacheManager`（内存默认，可切 Redis） |
 | ~~P1~~ | ~~成员列表 API 化~~ | **已实现**：`GET /api/ws/rooms/{room_id}/members` |
 | P1 | WS 心跳保活 | 客户端 ping / 服务端 pong，防 Nginx 长连接超时 |
+| P1 | H5 添加到桌面 | 支持 A2HS（Add to Home Screen）：补齐 Web App Manifest、图标与安装引导 |
 | P1 | AI 气氛组 Agent | `/backend/services/ai_agent.py`，与主鉴权链路隔离 |
 | P1 | 分区人格 LLM Agent | `backend/services/llm_agent.py`：`reply`→chat，`action`→system；带记忆折叠、超时/重试/熔断、单房间锁 |
 | P1 | 内容安全拦截 | 填充 `content_moderation`，接入风控或关键词 |
