@@ -1,44 +1,57 @@
 from __future__ import annotations
 
-import logging
+import json
 from typing import Any
 
+import redis.asyncio as redis
 from cache.base import CacheProvider
-
-logger = logging.getLogger("infra.cache.redis")
 
 
 class RedisCacheProvider(CacheProvider):
-    """
-    Redis 适配器占位：
-    当前预留切换入口，后续可接入 redis.asyncio。
-    """
-
     name = "redis"
 
     def __init__(self, *, dsn: str) -> None:
         self.dsn = dsn
-        self._connected = False
+        self._client: redis.Redis | None = None
 
     async def connect(self) -> None:
-        logger.warning(
-            "[CACHE] REDIS provider is placeholder now. DSN=%s, falling back to unavailable state.",
-            self.dsn,
-        )
-        self._connected = False
+        self._client = redis.from_url(self.dsn, encoding="utf-8", decode_responses=True)
+        await self._client.ping()
 
     async def disconnect(self) -> None:
-        self._connected = False
+        if self._client is None:
+            return
+        await self._client.aclose()
+        self._client = None
 
     async def healthcheck(self) -> bool:
-        return self._connected
+        if self._client is None:
+            return False
+        await self._client.ping()
+        return True
 
     async def get(self, key: str) -> Any | None:
-        return None
+        if self._client is None:
+            return None
+        raw = await self._client.get(key)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except Exception:
+            return raw
 
     async def set(self, key: str, value: Any, *, ttl_seconds: int | None = None) -> None:
-        _ = (key, value, ttl_seconds)
+        if self._client is None:
+            return
+        serialized = json.dumps(value, ensure_ascii=False)
+        if ttl_seconds is not None and ttl_seconds > 0:
+            await self._client.set(key, serialized, ex=ttl_seconds)
+            return
+        await self._client.set(key, serialized)
 
     async def delete(self, key: str) -> None:
-        _ = key
+        if self._client is None:
+            return
+        await self._client.delete(key)
 

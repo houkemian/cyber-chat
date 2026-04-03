@@ -13,8 +13,8 @@ class AppSettings:
     - CACHE_BACKEND: memory | redis
     """
 
-    db_backend: str = "sqlite"
-    cache_backend: str = "memory"
+    db_backend: str = "postgres"
+    cache_backend: str = "redis"
     sqlite_path: str = "./data/cyber_chat.db"
     postgres_dsn: str = "postgresql://postgres:postgres@127.0.0.1:5432/cyber_chat"
     redis_dsn: str = "redis://127.0.0.1:6379/0"
@@ -50,15 +50,28 @@ class AppSettings:
         except ValueError:
             parsed_probability = 0.3
 
+        postgres_dsn = os.getenv("POSTGRES_DSN", "").strip() or os.getenv("DATABASE_URL", "").strip()
+        if not postgres_dsn:
+            postgres_dsn = "postgresql://postgres:postgres@127.0.0.1:5432/cyber_chat"
+
+        redis_dsn = os.getenv("REDIS_DSN", "").strip() or os.getenv("REDIS_URL", "").strip()
+        if not redis_dsn:
+            redis_dsn = "redis://127.0.0.1:6379/0"
+
+        db_backend = os.getenv("DB_BACKEND", "").strip().lower()
+        if not db_backend:
+            db_backend = "postgres" if os.getenv("DATABASE_URL", "").strip() else "sqlite"
+
+        cache_backend = os.getenv("CACHE_BACKEND", "").strip().lower()
+        if not cache_backend:
+            cache_backend = "redis" if os.getenv("REDIS_URL", "").strip() else "memory"
+
         return cls(
-            db_backend=os.getenv("DB_BACKEND", "sqlite").strip().lower(),
-            cache_backend=os.getenv("CACHE_BACKEND", "memory").strip().lower(),
+            db_backend=db_backend,
+            cache_backend=cache_backend,
             sqlite_path=os.getenv("SQLITE_PATH", "./data/cyber_chat.db").strip(),
-            postgres_dsn=os.getenv(
-                "POSTGRES_DSN",
-                "postgresql://postgres:postgres@127.0.0.1:5432/cyber_chat",
-            ).strip(),
-            redis_dsn=os.getenv("REDIS_DSN", "redis://127.0.0.1:6379/0").strip(),
+            postgres_dsn=postgres_dsn,
+            redis_dsn=redis_dsn,
             jwt_secret=os.getenv("JWT_SECRET", "dev-secret-change-me-in-prod").strip(),
             cors_origins=cors_origins or None,
             cyber_poet_enabled=os.getenv("CYBER_POET_ENABLED", "1").strip().lower()

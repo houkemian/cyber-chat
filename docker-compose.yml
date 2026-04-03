@@ -39,3 +39,10 @@ services:
 
 volumes:
   sqlite_data:
+
+
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
