@@ -374,6 +374,19 @@ html[data-theme="starry"] {
   font-size: calc(12px * var(--header-h-scale));
 }
 
+.title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tag-mobile {
+  display: none;
+  margin: 0;
+  color: rgba(165, 243, 252, 0.88);
+  letter-spacing: 0.06em;
+}
+
 .title {
   margin: 8px 0 0;
   font-size: 32px;
@@ -504,6 +517,39 @@ html[data-theme="starry"] {
 .auth-btn-teleport span {
   position: relative;
   z-index: 1;
+}
+
+.auth-btn-install {
+  position: relative;
+  display: inline-block;
+  padding: 7px 12px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 2px solid #00f0ff;
+  border-radius: 0;
+  color: #b8f7ff;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.8);
+  box-shadow:
+    0 0 8px rgba(0, 240, 255, 0.45),
+    inset 0 0 8px rgba(0, 240, 255, 0.18);
+}
+
+.auth-btn-install:hover {
+  color: #ecfeff;
+  border-color: #7ef9ff;
+  box-shadow:
+    0 0 12px rgba(0, 240, 255, 0.7),
+    inset 0 0 10px rgba(0, 240, 255, 0.22);
+}
+
+.auth-btn-install:active {
+  transform: translateY(1px);
 }
 
 /* Hover：故障抖动 + 粉蓝交替发光加强 */
@@ -3129,6 +3175,22 @@ html[data-theme="starry"] {
     display: none;
   }
 
+  .title-row {
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tag-mobile {
+    display: inline;
+    font-size: 10px;
+    line-height: 1.2;
+    opacity: 0.9;
+    max-width: 44vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .title {
     margin: 0;
     font-size: 20px;
@@ -3166,6 +3228,11 @@ html[data-theme="starry"] {
   .header .auth-btn-teleport {
     font-size: calc(10px * var(--header-h-scale));
     padding: calc(5px * var(--header-h-scale)) calc(10px * var(--header-h-scale));
+  }
+
+  .auth-btn-install {
+    font-size: 10px;
+    padding: 5px 8px;
   }
 
   /* 聊天区圆角稍微压缩 */

@@ -6,6 +6,11 @@ import { RoomChat } from './pages/RoomChat'
 const DEFAULT_ROOM_ID = 'sector-001'
 const AVATAR_STORAGE_KEY = 'cyber_avatar_idx'
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
 // ── 扩展头像池：保留像素人像 + 新增物件种子 ──────────────────
 // 前 4 个为像素人像（使用 pixel-art style），后续为物件风格
 const AVATAR_POOL = [
@@ -31,6 +36,8 @@ function App() {
   const [noisePhase, setNoisePhase] = useState(0)
   const [chatHeight, setChatHeight] = useState('60vh')
   const [loginSeq, setLoginSeq] = useState(0)
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isInstalledMode, setIsInstalledMode] = useState(false)
   const [avatarIdx] = useState(() => {
     const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
     return saved ? Number(saved) : 0
@@ -83,6 +90,38 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const media = window.matchMedia('(display-mode: standalone)')
+    const updateInstalledMode = () => {
+      const standaloneByNavigator = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+      setIsInstalledMode(media.matches || standaloneByNavigator)
+    }
+    updateInstalledMode()
+    media.addEventListener('change', updateInstalledMode)
+    window.addEventListener('appinstalled', updateInstalledMode)
+    return () => {
+      media.removeEventListener('change', updateInstalledMode)
+      window.removeEventListener('appinstalled', updateInstalledMode)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent)
+    }
+    const handleAppInstalled = () => {
+      setDeferredInstallPrompt(null)
+      setIsInstalledMode(true)
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
   // 登录成功回调：关闭弹层，刷新状态
   const handleLoginSuccess = useCallback((name: string) => {
     setIsLoggedIn(true)
@@ -102,6 +141,16 @@ function App() {
     navigate(`/chat/${DEFAULT_ROOM_ID}`, { replace: true })
   }
 
+  const handleInstallApp = useCallback(async () => {
+    if (!deferredInstallPrompt) return
+    await deferredInstallPrompt.prompt()
+    const choice = await deferredInstallPrompt.userChoice
+    if (choice.outcome === 'accepted') {
+      setIsInstalledMode(true)
+    }
+    setDeferredInstallPrompt(null)
+  }, [deferredInstallPrompt])
+
   return (
     <div className="crt-container">
       {/* ── 主页面 ── */}
@@ -119,7 +168,10 @@ function App() {
             <div className="header-top">
               <div>
                 <p className="tag">禁止实名，允许发疯。</p>
-                <h1 className="title neon-flicker">2000.exe</h1>
+                <div className="title-row">
+                  <h1 className="title neon-flicker">2000.exe</h1>
+                  <span className="tag-mobile">禁止实名，允许发疯。</span>
+                </div>
               </div>
               <div className="auth-area">
                 {isLoggedIn ? (
@@ -142,6 +194,15 @@ function App() {
                   </div>
                 ) : (
                   <div className="auth-actions">
+                    {!isInstalledMode && deferredInstallPrompt && (
+                      <button
+                        type="button"
+                        className="auth-btn-install"
+                        onClick={() => { void handleInstallApp() }}
+                      >
+                        <span>[ 添加到桌面 ]</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="auth-btn-teleport"

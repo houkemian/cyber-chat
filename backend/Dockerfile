@@ -6,7 +6,7 @@ WORKDIR /app
 
 # 先把依赖清单拷进去，并安装依赖（这一步放在前面可以利用缓存加速构建）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 
 # 把剩下的所有后端代码拷进去
 COPY . .
