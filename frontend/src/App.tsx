@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { LoginTerminal } from './pages/LoginTerminal'
 import { RoomChat } from './pages/RoomChat'
@@ -38,6 +38,10 @@ function App() {
   const [loginSeq, setLoginSeq] = useState(0)
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalledMode, setIsInstalledMode] = useState(false)
+  const [loginMode, setLoginMode] = useState<'phone' | 'terminal'>('phone')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [agreePolicy, setAgreePolicy] = useState(true)
+  const [phoneLoginHint, setPhoneLoginHint] = useState('')
   const [avatarIdx] = useState(() => {
     const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
     return saved ? Number(saved) : 0
@@ -151,6 +155,18 @@ function App() {
     setDeferredInstallPrompt(null)
   }, [deferredInstallPrompt])
 
+  const normalizedPhone = phoneNumber.replace(/\D/g, '').slice(0, 11)
+  const canQuickLogin = normalizedPhone.length === 11 && agreePolicy
+
+  const handlePhoneQuickLogin = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!canQuickLogin) {
+      setPhoneLoginHint('ERR//MISSING_PAYLOAD: 写入 11 位号码并授权条款后重试。')
+      return
+    }
+    setPhoneLoginHint('PASS//SILENT_UPLINK: 认证通道已待命，接入运营商网关后自动放行。')
+  }
+
   return (
     <div className="crt-container">
       {/* ── 主页面 ── */}
@@ -243,7 +259,102 @@ function App() {
             >
               ✕
             </button>
-            <LoginTerminal onSuccess={handleLoginSuccess} />
+            <div className="login-modal-content">
+              <div className="login-mode-tabs" role="tablist" aria-label="登录方式切换">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginMode === 'phone'}
+                  className={`login-mode-tab ${loginMode === 'phone' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLoginMode('phone')
+                    setPhoneLoginHint('')
+                  }}
+                >
+                  BYPASS.SMS // 静默越权
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginMode === 'terminal'}
+                  className={`login-mode-tab ${loginMode === 'terminal' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLoginMode('terminal')
+                    setPhoneLoginHint('')
+                  }}
+                >
+                  TERMINAL_REQ // 密钥接驳
+                </button>
+              </div>
+
+              {loginMode === 'phone' ? (
+                <form className={`phone-login-panel ${phoneNumber ? 'is-typing' : ''}`} onSubmit={handlePhoneQuickLogin}>
+                  <span className="phone-hud-corner phone-hud-corner-tl" aria-hidden>+</span>
+                  <span className="phone-hud-corner phone-hud-corner-tr" aria-hidden>+</span>
+                  <span className="phone-hud-corner phone-hud-corner-bl" aria-hidden>+</span>
+                  <span className="phone-hud-corner phone-hud-corner-br" aria-hidden>+</span>
+
+                  <div className="phone-hud-lamps" aria-hidden>
+                    <span className="hud-lamp lamp-green-square"></span>
+                    <span className="hud-lamp lamp-green-square"></span>
+                    <span className="hud-lamp lamp-green-square"></span>
+                    <span className="hud-lamp-label">AUTH BUS</span>
+                  </div>
+
+                  <div className="phone-login-console-head">
+                    <p className="phone-login-title">[ PROTOCOL STATUS ] : ACTIVE</p>
+                    <p className="phone-login-subtitle">NODE: 2000.EXE.AUTH-GATEWAY / MODE: ZERO-CODE</p>
+                  </div>
+
+                  <div className="phone-login-marquee" aria-hidden>
+                    {'>> 拒绝物理定位 // 允许意识游离 // '}
+                  </div>
+
+                  <p className="phone-login-desc">
+                    [ SYSTEM MSG: 链路验证通过后，将自动分配临时 IP 并唤醒赛博义体。]
+                  </p>
+
+                  <label className="phone-login-label" htmlFor="phone-number-input"></label>
+                  <div className="phone-input-shell">
+                    <span className="phone-input-prefix" aria-hidden>{'>_'}</span>
+                    <input
+                      id="phone-number-input"
+                      className="phone-login-input"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 11))
+                        setPhoneLoginHint('')
+                      }}
+                      placeholder="等待输入 11 位通讯序列..."
+                    />
+                    <span className="phone-input-cursor" aria-hidden></span>
+                  </div>
+
+                  <p className="phone-login-wire mt-3">
+                    {'[ PIPELINE ] Device Fingerprint -> Carrier Verify -> Session Key Mint'}
+                  </p>
+
+                  <label className="phone-login-check">
+                    <input
+                      type="checkbox"
+                      checked={agreePolicy}
+                      onChange={(e) => setAgreePolicy(e.target.checked)}
+                    />
+                    <span>我确认将设备指纹与号码摘要提交至网关，接受《幽灵链路公约》与《黑箱隐私协议》。</span>
+                  </label>
+
+                  <button type="submit" className="phone-login-submit-btn" disabled={!canQuickLogin}>
+                    {'>_ EXECUTE // 强制越权接入'}
+                  </button>
+                  {phoneLoginHint && <p className="phone-login-hint">{phoneLoginHint}</p>}
+                </form>
+              ) : (
+                <LoginTerminal onSuccess={handleLoginSuccess} />
+              )}
+            </div>
           </div>
         </div>
       )}

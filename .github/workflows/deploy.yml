@@ -33,7 +33,7 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "backend/,frontend/dist/,frontend/nginx.conf,docker-compose.yml"
         # ▼ 核心修改 1：将传输目标锚定在 sysop 的专属领地 ▼
-        target: "/home/sysop/cyber-chat" 
+        target: ${{ secrets.DEPLOY_PATH}}
 
     - name: 5. SSH 登录服务器并重启 Docker 容器
       uses: appleboy/ssh-action@master
@@ -43,6 +43,13 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           # ▼ 核心修改 2：登录后进入正确的目录 ▼
-          cd /home/sysop/cyber-chat
+          cd ${{ secrets.DEPLOY_PATH}}
+
+          # 确保当前用户有权限操作 Docker
+          # 如果直接操作失败，则尝试通过 sudo 执行（因为 sysop 在 sudoers 里）
+          echo ">>> 正在检查 Docker 权限..."
+          docker ps > /dev/null 2>&1 || alias docker='sudo docker'
+
           docker compose down
           docker compose up -d --build
+          echo ">>> 部署完成，系统已上线！"

@@ -1171,6 +1171,357 @@ html[data-theme="starry"] {
   background: rgba(34, 197, 94, 0.15);
 }
 
+.login-modal-content {
+  position: relative;
+  border: 2px solid #4ef3ff;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(7, 14, 36, 0.95), rgba(5, 8, 24, 0.96)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.05) 0px,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  box-shadow:
+    0 0 0 2px rgba(5, 12, 34, 0.9),
+    0 0 0 4px rgba(188, 0, 255, 0.4),
+    0 0 18px rgba(0, 240, 255, 0.28),
+    inset 0 0 36px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.login-modal-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 0, 102, 0.07), transparent 28%, transparent 72%, rgba(0, 240, 255, 0.08)),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 2px);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+.login-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.5);
+  background: linear-gradient(180deg, rgba(10, 30, 54, 0.8), rgba(7, 20, 42, 0.74));
+}
+
+.login-mode-tab {
+  appearance: none;
+  border-top: 2px solid rgba(190, 245, 255, 0.9);
+  border-left: 2px solid rgba(190, 245, 255, 0.9);
+  border-right: 2px solid rgba(11, 28, 48, 0.95);
+  border-bottom: 2px solid rgba(11, 28, 48, 0.95);
+  background: linear-gradient(180deg, rgba(36, 84, 124, 0.72), rgba(18, 48, 74, 0.76));
+  color: #d8f7ff;
+  border-radius: 0;
+  padding: 8px 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  font-family: "Consolas", "Courier New", monospace;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: filter 0.15s ease, text-shadow 0.15s ease;
+}
+
+.login-mode-tab:hover {
+  filter: brightness(1.06);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+.login-mode-tab.is-active {
+  border-top: 2px solid rgba(12, 28, 50, 0.95);
+  border-left: 2px solid rgba(12, 28, 50, 0.95);
+  border-right: 2px solid rgba(170, 236, 255, 0.95);
+  border-bottom: 2px solid rgba(170, 236, 255, 0.95);
+  color: #78f6ff;
+  box-shadow:
+    inset 0 0 14px rgba(0, 240, 255, 0.16),
+    0 0 10px rgba(188, 0, 255, 0.24);
+  background: linear-gradient(180deg, rgba(14, 32, 62, 0.9), rgba(8, 18, 38, 0.88));
+}
+
+.phone-login-panel {
+  position: relative;
+  padding: 14px 14px 16px;
+  font-family: "Consolas", "Courier New", monospace;
+  border: 1px dashed rgba(0, 240, 255, 0.4);
+}
+
+.phone-login-panel::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  border: 1px solid rgba(57, 255, 20, 0.2);
+}
+
+.phone-hud-corner {
+  position: absolute;
+  color: #39ff14;
+  font-size: 12px;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+}
+
+.phone-hud-corner-tl { top: 4px; left: 5px; }
+.phone-hud-corner-tr { top: 4px; right: 5px; }
+.phone-hud-corner-bl { bottom: 4px; left: 5px; }
+.phone-hud-corner-br { bottom: 4px; right: 5px; }
+
+.phone-hud-lamps {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.hud-lamp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.lamp-green-square {
+  border-radius: 0;
+  background: #39ff14;
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.75);
+  animation: hud-blink-green-seq 1.2s steps(1, end) infinite;
+}
+
+.phone-hud-lamps .lamp-green-square:nth-child(1) { animation-delay: 0s; }
+.phone-hud-lamps .lamp-green-square:nth-child(2) { animation-delay: 0.2s; }
+.phone-hud-lamps .lamp-green-square:nth-child(3) { animation-delay: 0.4s; }
+
+.hud-lamp-label {
+  margin-left: 4px;
+  font-size: 10px;
+  color: #9be8ff;
+  letter-spacing: 0.12em;
+}
+
+.phone-input-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.phone-input-prefix {
+  position: absolute;
+  left: 10px;
+  z-index: 1;
+  color: #39ff14;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.65);
+}
+
+.phone-login-console-head {
+  margin-bottom: 10px;
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  padding: 8px 10px;
+  background: rgba(4, 16, 40, 0.7);
+}
+
+.phone-login-title {
+  margin: 0;
+  color: #72f7ff;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+.phone-login-subtitle {
+  margin: 6px 0 0;
+  color: #c4b5fd;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+.phone-login-marquee {
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  color: #39ff14;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.55);
+  border-top: 1px dashed rgba(57, 255, 20, 0.6);
+  border-bottom: 1px dashed rgba(57, 255, 20, 0.6);
+  padding: 4px 0;
+}
+
+.phone-login-desc {
+  margin: 8px 0 10px;
+  color: rgba(206, 239, 255, 0.92);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.phone-login-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #7ae8ff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.phone-login-input {
+  width: 100%;
+  height: 40px;
+  margin-bottom: 12px;
+  border-top: 2px solid rgba(9, 24, 42, 0.92);
+  border-left: 2px solid rgba(9, 24, 42, 0.92);
+  border-right: 2px solid rgba(152, 229, 255, 0.95);
+  border-bottom: 2px solid rgba(152, 229, 255, 0.95);
+  border-radius: 0;
+  background: rgba(0, 6, 18, 0.88);
+  color: #8bff68;
+  padding: 0 30px;
+  outline: none;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 6px rgba(57, 255, 20, 0.45);
+  transition: box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.phone-login-input:focus {
+  box-shadow:
+    0 0 0 1px rgba(57, 255, 20, 0.62),
+    0 0 10px rgba(57, 255, 20, 0.3);
+  filter: brightness(1.04);
+}
+
+.phone-input-cursor {
+  position: absolute;
+  right: 12px;
+  width: 8px;
+  height: 16px;
+  background: #39ff14;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.75);
+  animation: hud-cursor-blink 0.9s steps(1, end) infinite;
+  pointer-events: none;
+}
+
+.phone-login-panel.is-typing .phone-login-input {
+  animation: hud-input-jitter 0.08s steps(2, end) 8;
+}
+
+.phone-login-wire {
+  margin: 4px 0 12px;
+  color: #f9a8d4;
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  border-left: 2px solid rgba(249, 168, 212, 0.7);
+  padding-left: 8px;
+}
+
+.phone-login-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: rgba(189, 235, 255, 0.9);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.phone-login-check input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1px solid rgba(0, 240, 255, 0.8);
+  background: rgba(6, 16, 32, 0.9);
+  box-shadow: inset 0 0 6px rgba(0, 240, 255, 0.2);
+  position: relative;
+}
+
+.phone-login-check input:checked::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  top: 2px;
+  left: 2px;
+  background: #39ff14;
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.85);
+}
+
+.phone-login-submit-btn {
+  width: 100%;
+  height: 40px;
+  border-top: 2px solid rgba(170, 255, 154, 0.9);
+  border-left: 2px solid rgba(170, 255, 154, 0.9);
+  border-right: 2px solid rgba(8, 62, 28, 0.95);
+  border-bottom: 2px solid rgba(8, 62, 28, 0.95);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(36, 134, 66, 0.86), rgba(14, 74, 36, 0.9));
+  color: #d9ffcc;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  font-family: "Consolas", "Courier New", monospace;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
+  box-shadow:
+    inset 0 0 10px rgba(57, 255, 20, 0.2),
+    0 0 12px rgba(57, 255, 20, 0.24);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+}
+
+.phone-login-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 12px rgba(57, 255, 20, 0.26),
+    0 0 16px rgba(57, 255, 20, 0.35);
+}
+
+.phone-login-submit-btn:disabled {
+  opacity: 0.52;
+  text-shadow: none;
+  cursor: not-allowed;
+}
+
+.phone-login-hint {
+  margin: 10px 0 0;
+  color: #a5f3fc;
+  font-size: 11px;
+  line-height: 1.5;
+  border-left: 2px solid rgba(103, 232, 249, 0.7);
+  padding-left: 8px;
+}
+
+@keyframes hud-cursor-blink {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
+}
+
+@keyframes hud-input-jitter {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(0.3px); }
+  50% { transform: translateX(-0.3px); }
+  75% { transform: translateX(0.25px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes hud-blink-green-seq {
+  0%, 18% { opacity: 1; }
+  19%, 100% { opacity: 0.2; }
+}
+
 /* 头像下拉菜单 */
 .user-avatar-wrap {
   position: relative;
@@ -3233,6 +3584,28 @@ html[data-theme="starry"] {
   .auth-btn-install {
     font-size: 10px;
     padding: 5px 8px;
+  }
+
+  .login-modal-mask {
+    padding: 10px;
+  }
+
+  .login-modal-box {
+    max-height: 92dvh;
+  }
+
+  .login-mode-tabs {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .login-mode-tab {
+    font-size: 11px;
+    padding: 8px 6px;
+  }
+
+  .phone-login-panel {
+    padding: 12px;
   }
 
   /* 聊天区圆角稍微压缩 */
