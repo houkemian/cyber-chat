@@ -79,6 +79,8 @@
 | 优先级 | 任务 | 关键点 |
 |--------|------|--------|
 | P0 | 生产安全加固 | 移除万能密码 `0000`，轮换 `JWT_SECRET`，`CORS_ORIGINS` 精确注入 |
+| P1 | 短信验证登录 | 短信网关对接、验证码签发 / 校验 / 限流与过期；手机号与用户资料、JWT 签发链路绑定；防刷与审计 |
+| P1 | 手机无感登录 | 本机号码一键登录（运营商 SDK）或 refresh / 可信设备静默续期；与现有 JWT 会话、登出与多端互斥策略对齐 |
 | ~~P0~~ | ~~PostgreSQL 正式接入~~ | **已实现**：`asyncpg` 连接池 + `user_profiles/chat_messages` 自动建表 |
 | ~~P0~~ | ~~公告 API 化~~ | **已实现**：`GET /api/announcements`，数据经 `CacheManager`（内存默认，可切 Redis） |
 | ~~P1~~ | ~~成员列表 API 化~~ | **已实现**：`GET /api/ws/rooms/{room_id}/members` |
