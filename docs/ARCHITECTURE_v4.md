@@ -61,6 +61,12 @@
 | `POSTGRES_USER` | `cyber_user` | ✅ | PostgreSQL 用户名（供 compose 与 db 容器初始化） |
 | `POSTGRES_PASSWORD` | 无 | ✅ | PostgreSQL 密码（必须在 `.env` 显式设置） |
 | `POSTGRES_DB` | `cyber_chat` | ✅ | PostgreSQL 数据库名 |
+| `SMS_PROVIDER` | `mock` | 建议 | 短信服务提供方：`mock` / `aliyun` |
+| `MOBILE_LOGIN_PROVIDER` | `mock` | 建议 | 手机无感登录校验提供方：`mock` / `aliyun` |
+| `ALIYUN_ACCESS_KEY_ID` | `""` | 阿里云必填 | 阿里云 AccessKey ID（短信 + 号码认证） |
+| `ALIYUN_ACCESS_KEY_SECRET` | `""` | 阿里云必填 | 阿里云 AccessKey Secret |
+| `ALIYUN_SMS_SIGN_NAME` | `""` | 阿里云短信必填 | 短信签名 |
+| `ALIYUN_SMS_TEMPLATE_CODE` | `""` | 阿里云短信必填 | 短信模板编码（模板变量 `code`） |
 
 ---
 
@@ -79,13 +85,13 @@
 | 优先级 | 任务 | 关键点 |
 |--------|------|--------|
 | P0 | 生产安全加固 | 移除万能密码 `0000`，轮换 `JWT_SECRET`，`CORS_ORIGINS` 精确注入 |
-| P1 | 短信验证登录 | 短信网关对接、验证码签发 / 校验 / 限流与过期；手机号与用户资料、JWT 签发链路绑定；防刷与审计 |
-| P1 | 手机无感登录 | 本机号码一键登录（运营商 SDK）或 refresh / 可信设备静默续期；与现有 JWT 会话、登出与多端互斥策略对齐 |
+| P1 | 短信验证登录（阿里云） | **已接入 Provider 抽象**：`SMS_PROVIDER=aliyun` 走阿里云短信发送，验证码校验与 JWT 签发链路已打通；待补：限流、防刷与审计 |
+| P1 | 手机无感登录（阿里云） | **已接入** `POST /api/auth/mobile/verify`：前端提交运营商 access_token，后端校验后签发 JWT；待补：前端运营商 SDK 正式接入与多端互斥策略 |
 | ~~P0~~ | ~~PostgreSQL 正式接入~~ | **已实现**：`asyncpg` 连接池 + `user_profiles/chat_messages` 自动建表 |
 | ~~P0~~ | ~~公告 API 化~~ | **已实现**：`GET /api/announcements`，数据经 `CacheManager`（内存默认，可切 Redis） |
 | ~~P1~~ | ~~成员列表 API 化~~ | **已实现**：`GET /api/ws/rooms/{room_id}/members` |
 | P1 | WS 心跳保活 | 客户端 ping / 服务端 pong，防 Nginx 长连接超时 |
-| ~~P1~~ | ~~H5 添加到桌面~~ | **已实现**：A2HS（Manifest、图标、`beforeinstallprompt` 安装引导） |
+| P1 | H5 添加到桌面异常修复 | 当前部分机型/浏览器无法正常触发安装；补齐 HTTPS + Manifest + SW 生效链路校验，增加安装入口兜底（菜单引导/手动添加步骤）与埋点 |
 | P1 | AI 气氛组 Agent | `/backend/services/ai_agent.py`，与主鉴权链路隔离 |
 | P1 | 分区人格 LLM Agent | `backend/services/llm_agent.py`：`reply`→chat，`action`→system；带记忆折叠、超时/重试/熔断、单房间锁 |
 | P1 | 内容安全拦截 | 填充 `content_moderation`，接入风控或关键词 |
@@ -96,5 +102,40 @@
 | P2 | Tool Calls | 在前端引入可扩展的“工具调用”通道（结构化 JSON），允许 Agent 触发 UI/环境动作（不阻塞主链路） |
 
 ---
+
+## 15. H5 打包成 APP 所需清单
+
+> 目标：在保留现有 H5 主体的前提下，提供可上架/可安装的移动端 APP 形态。  
+> 推荐两条路并行评估：**PWA 安装增强**（轻量）与 **壳工程打包**（Capacitor/TWA/uni-app 壳）。
+
+### 15.1 通用准备（两条路线都需要）
+
+- 稳定的线上 HTTPS 域名（证书有效、全站无 mixed content）。
+- 前端生产构建可重复（版本号、构建时间、环境变量区分 dev/staging/prod）。
+- 登录态策略与风控策略（token 刷新、设备标识、异常登录告警）。
+- 兼容性基线定义（最低 Android/iOS 版本、Chrome/WebView 版本）。
+- 监控与埋点（启动失败、白屏、安装入口点击、安装成功率、崩溃率）。
+
+### 15.2 路线 A：PWA（添加到桌面）
+
+- `manifest.webmanifest`：名称、图标（至少 192/512）、`display`、`start_url`、`theme_color`。
+- Service Worker：可注册且处于激活态，核心静态资源缓存策略清晰。
+- 安装条件校验：HTTPS、生效 manifest、合规 icon、可控 `beforeinstallprompt`。
+- iOS 兼容：补充 Safari 手动“添加到主屏幕”引导（iOS 不支持标准安装弹窗）。
+- 安装失败兜底：在 UI 提供“如何添加到桌面”分机型说明与重试入口。
+
+### 15.3 路线 B：壳工程打包（真正 APP）
+
+- 壳技术选型：Capacitor（通用 WebView）/ TWA（Android）/ React Native WebView（定制）。
+- Android 侧：应用签名、包名、`targetSdkVersion`、权限清单、启动图标与闪屏、渠道包策略。
+- iOS 侧：Bundle ID、证书与 Provisioning Profile、ATS 白名单、隐私权限描述（相机/相册/通知等）。
+- 原生能力桥接：推送、文件访问、剪贴板、分享、定位等能力按需接入插件。
+- 发布准备：隐私政策、用户协议、应用截图、版本说明、审核素材与回滚方案。
+
+### 15.4 当前项目建议优先级
+
+1. 先修复 P1 的 A2HS 异常，拉高移动端“可安装率”。
+2. 同步建立壳工程 PoC（优先 Capacitor + Android），验证登录态、WS 长连、消息通知。
+3. 根据留存与分发目标决定是否推进双端商店上架。
 
 *重大架构变更请更新本分卷索引，或新增 `ARCHITECTURE_v5.md` 并在此添加链接。*

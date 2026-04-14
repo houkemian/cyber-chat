@@ -5,10 +5,11 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.settings import get_settings
-from schemas.auth import AuthResponse, SendKeyRequest, VerifyKeyRequest
+from schemas.auth import AuthResponse, MobileVerifyRequest, SendKeyRequest, VerifyKeyRequest
 from utils.generator import generate_cyber_name
 from utils.security import create_access_token
-from utils.sms_mock import sms_service
+from utils.mobile_auth_service import mobile_auth_service
+from utils.sms_service import sms_service
 
 router = APIRouter(tags=["auth"])
 
@@ -18,6 +19,34 @@ router = APIRouter(tags=["auth"])
 # 当前为空实现，后续接入敏感词 / 风控 SDK 时仅需在此处填充。
 async def content_moderation() -> None:
     pass
+
+
+async def _issue_auth_response(request: Request, phone_number: str) -> AuthResponse:
+    db_manager = request.app.state.db
+    cyber_name = await db_manager.get_user_cyber_name(phone_number=phone_number)
+    if not cyber_name:
+        generated_name = generate_cyber_name()
+        created = await db_manager.create_user_profile(
+            phone_number=phone_number,
+            cyber_name=generated_name,
+        )
+        if created:
+            cyber_name = generated_name
+        else:
+            cyber_name = await db_manager.get_user_cyber_name(phone_number=phone_number)
+            if not cyber_name:
+                cyber_name = generated_name
+
+    secret_key = get_settings().jwt_secret
+    token = create_access_token(
+        secret_key=secret_key,
+        payload={
+            "phone_number": phone_number,
+            "cyber_name": cyber_name,
+        },
+        expires_delta=timedelta(hours=24),
+    )
+    return AuthResponse(token=token, cyber_name=cyber_name)
 
 
 # ── 接口 1：POST /api/auth/send-key ─────────────────────────
@@ -63,33 +92,19 @@ async def verify(
             detail="invalid_or_expired_code",
         )
 
-    # 首次登录入库：同一手机号只在第一次生成并写入 cyber_name
-    db_manager = request.app.state.db
-    cyber_name = await db_manager.get_user_cyber_name(phone_number=payload.phone_number)
-    if not cyber_name:
-        generated_name = generate_cyber_name()
-        created = await db_manager.create_user_profile(
-            phone_number=payload.phone_number,
-            cyber_name=generated_name,
-        )
-        if created:
-            cyber_name = generated_name
-        else:
-            # 并发兜底：若同一时刻已被其它请求创建，则回查已存档案。
-            cyber_name = await db_manager.get_user_cyber_name(phone_number=payload.phone_number)
-            if not cyber_name:
-                cyber_name = generated_name
+    return await _issue_auth_response(request, payload.phone_number)
 
-    # 从环境变量读取签名密钥；开发环境有默认值，生产环境务必设置 JWT_SECRET
-    secret_key = get_settings().jwt_secret
 
-    token = create_access_token(
-        secret_key=secret_key,
-        payload={
-            "phone_number": payload.phone_number,
-            "cyber_name": cyber_name,
-        },
-        expires_delta=timedelta(hours=24),
-    )
-
-    return AuthResponse(token=token, cyber_name=cyber_name)
+@router.post("/auth/mobile/verify", response_model=AuthResponse)
+async def verify_mobile_login(
+    request: Request,
+    payload: MobileVerifyRequest,
+    _: None = Depends(content_moderation),
+) -> AuthResponse:
+    """
+    无感登录：校验运营商 SDK access_token -> 拿到手机号 -> 签发 JWT。
+    """
+    phone_number = await mobile_auth_service.verify_access_token(payload.access_token)
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="invalid_mobile_access_token")
+    return await _issue_auth_response(request, phone_number)

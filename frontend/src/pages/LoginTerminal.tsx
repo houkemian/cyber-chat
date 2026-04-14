@@ -40,6 +40,7 @@ export function LoginTerminal({ onSuccess }: Props) {
   const [decodingLines, setDecodingLines] = useState<string[]>([])
   const [cyberName, setCyberName] = useState('')
   const [error, setError] = useState('')
+  const [silentLoading, setSilentLoading] = useState(false)
   const [bootText, setBootText] = useState('')
   const [cursor, setCursor] = useState(true)
   const decodingRef = useRef<HTMLDivElement>(null)
@@ -111,6 +112,40 @@ export function LoginTerminal({ onSuccess }: Props) {
     }
   }
 
+  const handleSilentLogin = async () => {
+    setError('')
+    setSilentLoading(true)
+    try {
+      const globalToken = (window as Window & {
+        ALIYUN_MOBILE_ACCESS_TOKEN?: string
+      }).ALIYUN_MOBILE_ACCESS_TOKEN
+      const maybeToken = globalToken ?? window.prompt('请输入一键登录 access_token（本地调试可用 mock:13800138000）', '') ?? ''
+      const accessToken = maybeToken.trim()
+      if (!accessToken) {
+        setError('>> ERROR: 未获取到一键登录 token，请重试')
+        return
+      }
+      const res = await axios.post<{ token: string; cyber_name: string }>(
+        `${API_AUTH_URL}/mobile/verify`,
+        { access_token: accessToken },
+      )
+      window.localStorage.setItem('cyber_token', res.data.token)
+      window.localStorage.setItem('cyber_name', res.data.cyber_name)
+      setCyberName(res.data.cyber_name)
+      setPhase('decoding')
+      setDecodingLines(makeDecodingLines())
+      setTimeout(() => setPhase('success'), 1200)
+    } catch (e: unknown) {
+      const msg =
+        axios.isAxiosError(e) && e.response?.data?.detail === 'invalid_mobile_access_token'
+          ? '>> ERROR: 无感登录令牌校验失败'
+          : '>> ERROR: 无感登录通道异常，请稍后重试'
+      setError(msg)
+    } finally {
+      setSilentLoading(false)
+    }
+  }
+
   const handleVerify = async () => {
     setError('')
     if (!code.trim()) { setError('>> ERROR: 跃迁密匙为空，终端拒绝接入'); return }
@@ -178,6 +213,7 @@ export function LoginTerminal({ onSuccess }: Props) {
         {/* 主交互 */}
         {(phase === 'idle' || phase === 'countdown') && (
           <div className="terminal-body">
+            <p className="terminal-hint">{'> [ 密钥接驳 ] 验证码登录通道'}</p>
             <label className="terminal-label">
               {'> 请输入地球维度的通讯终端号 (Phone Number):'}
               <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>
@@ -227,13 +263,27 @@ export function LoginTerminal({ onSuccess }: Props) {
                 </div>
                 <button
                   type="button"
-                  className="terminal-btn terminal-btn-override mt-3"
+                  className="terminal-btn mt-3"
                   onClick={handleVerify}
                 >
                   {'[ 执行身份覆写 (Override) ]'}
                 </button>
               </>
             )}
+
+            <div className="mt-6">
+              <p className="terminal-hint">{'> [ 静默越权 ] 无感登录通道'}</p>
+              <button
+                type="button"
+                className={`terminal-btn terminal-btn-override mt-3 ${silentLoading ? 'terminal-btn-disabled' : ''}`}
+                onClick={handleSilentLogin}
+                disabled={silentLoading}
+              >
+                {silentLoading
+                  ? '> 正在握手运营商无感信道...'
+                  : '>_ EXECUTE // 强制越权接入'}
+              </button>
+            </div>
 
             {error && <p className="terminal-error mt-3">{error}</p>}
           </div>

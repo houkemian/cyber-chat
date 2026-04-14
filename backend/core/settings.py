@@ -27,6 +27,12 @@ class AppSettings:
     cyber_poet_max_messages_per_sec: int = 2
 
     llm_agent_trigger_probability: float = 0.3
+    sms_provider: str = "mock"
+    aliyun_access_key_id: str = ""
+    aliyun_access_key_secret: str = ""
+    aliyun_sms_sign_name: str = ""
+    aliyun_sms_template_code: str = ""
+    mobile_login_provider: str = "mock"
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -83,6 +89,12 @@ class AppSettings:
                 int(os.getenv("CYBER_POET_MAX_MESSAGES_PER_SEC", "2").strip()),
             ),
             llm_agent_trigger_probability=max(0.0, min(parsed_probability, 1.0)),
+            sms_provider=os.getenv("SMS_PROVIDER", "mock").strip().lower(),
+            aliyun_access_key_id=os.getenv("ALIYUN_ACCESS_KEY_ID", "").strip(),
+            aliyun_access_key_secret=os.getenv("ALIYUN_ACCESS_KEY_SECRET", "").strip(),
+            aliyun_sms_sign_name=os.getenv("ALIYUN_SMS_SIGN_NAME", "").strip(),
+            aliyun_sms_template_code=os.getenv("ALIYUN_SMS_TEMPLATE_CODE", "").strip(),
+            mobile_login_provider=os.getenv("MOBILE_LOGIN_PROVIDER", "mock").strip().lower(),
         )
 
 

@@ -18,3 +18,8 @@ class AuthResponse(BaseModel):
     # JWT 访问令牌 + 系统分配的千禧网名
     token: str
     cyber_name: str
+
+
+class MobileVerifyRequest(BaseModel):
+    # 运营商一键登录 SDK 返回的授权 token
+    access_token: str = Field(min_length=6, max_length=2048)

@@ -6,3 +6,7 @@ PyJWT==2.10.1
 redis
 asyncpg
 openai
+alibabacloud_dysmsapi20170525
+alibabacloud_dypnsapi20170525
+alibabacloud_tea_openapi
+alibabacloud_tea_util
