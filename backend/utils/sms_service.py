@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from core.settings import get_settings
@@ -10,6 +11,10 @@ logger = logging.getLogger("sms-service")
 logger.setLevel(logging.INFO)
 
 
+def _log_ts() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
+
+
 class SMSService:
     async def send_code(self, phone_number: str) -> None:
         settings = get_settings()
@@ -17,7 +22,7 @@ class SMSService:
             sent = await self._send_aliyun_code(phone_number)
             if sent:
                 return
-            logger.warning("aliyun sms send failed, fallback to mock provider")
+            logger.warning("[ALIYUN_SMS_FALLBACK] ts=%s msg=%s", _log_ts(), "aliyun sms send failed, fallback to mock provider")
         await mock_sms_service.send_code(phone_number)
 
     async def verify_code(self, phone_number: str, sms_code: str) -> bool:
@@ -39,7 +44,7 @@ class SMSService:
             from alibabacloud_dysmsapi20170525 import models as dysms_models
             from alibabacloud_dysmsapi20170525.client import Client as DysmsClient
         except Exception:
-            logger.exception("aliyun sms sdk not installed")
+            logger.exception("[ALIYUN_SMS_SDK_ERROR] ts=%s msg=%s", _log_ts(), "aliyun sms sdk not installed")
             return False
 
         try:
@@ -64,8 +69,9 @@ class SMSService:
                 template_code=settings.aliyun_sms_template_code,
                 template_param=f'{{"code":"{code}"}}',
             )
-            logger.info(
-                "aliyun sms request: phone_numbers=%s sign_name=%s template_code=%s template_param=%s",
+            logger.warning(
+                "[ALIYUN_SMS_REQ] ts=%s phone_numbers=%s sign_name=%s template_code=%s template_param=%s",
+                _log_ts(),
                 request.phone_numbers,
                 request.sign_name,
                 request.template_code,
@@ -74,8 +80,9 @@ class SMSService:
             runtime = util_models.RuntimeOptions()
             response = client.send_sms_with_options(request, runtime)
             body = getattr(response, "body", None)
-            logger.info(
-                "aliyun sms response: code=%s message=%s request_id=%s biz_id=%s",
+            logger.warning(
+                "[ALIYUN_SMS_RESP] ts=%s code=%s message=%s request_id=%s biz_id=%s",
+                _log_ts(),
                 getattr(body, "code", ""),
                 getattr(body, "message", ""),
                 getattr(body, "request_id", ""),
@@ -83,11 +90,11 @@ class SMSService:
             )
             body_code = getattr(getattr(response, "body", None), "code", "")
             if body_code != "OK":
-                logger.error("aliyun sms send error: %s", body_code)
+                logger.error("[ALIYUN_SMS_ERROR] ts=%s code=%s", _log_ts(), body_code)
                 return False
             return True
         except Exception:
-            logger.exception("aliyun sms send exception")
+            logger.exception("[ALIYUN_SMS_EXCEPTION] ts=%s msg=%s", _log_ts(), "aliyun sms send exception")
             return False
 
 
