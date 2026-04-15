@@ -7,6 +7,7 @@ from core.settings import get_settings
 from utils.sms_mock import sms_service as mock_sms_service
 
 logger = logging.getLogger("sms-service")
+logger.setLevel(logging.INFO)
 
 
 class SMSService:
