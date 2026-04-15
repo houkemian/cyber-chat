@@ -74,6 +74,7 @@ class SMSService:
                 phone_number=phone_number,
                 sign_name=settings.aliyun_sms_sign_name,
                 template_code=settings.aliyun_sms_template_code,
+                template_param="{\"code\":\"##code##\",\"min\":\"5\"}"
             )
             logger.warning(
                 "[ALIYUN_SMS_REQ] ts=%s action=SendSmsVerifyCodeRequest phone_number=%s sign_name=%s template_code=%s",
