@@ -63,8 +63,23 @@ class SMSService:
                 template_code=settings.aliyun_sms_template_code,
                 template_param=f'{{"code":"{code}"}}',
             )
+            logger.info(
+                "aliyun sms request: phone_numbers=%s sign_name=%s template_code=%s template_param=%s",
+                request.phone_numbers,
+                request.sign_name,
+                request.template_code,
+                request.template_param,
+            )
             runtime = util_models.RuntimeOptions()
             response = client.send_sms_with_options(request, runtime)
+            body = getattr(response, "body", None)
+            logger.info(
+                "aliyun sms response: code=%s message=%s request_id=%s biz_id=%s",
+                getattr(body, "code", ""),
+                getattr(body, "message", ""),
+                getattr(body, "request_id", ""),
+                getattr(body, "biz_id", ""),
+            )
             body_code = getattr(getattr(response, "body", None), "code", "")
             if body_code != "OK":
                 logger.error("aliyun sms send error: %s", body_code)
