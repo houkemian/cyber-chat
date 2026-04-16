@@ -2,15 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { API_AUTH_URL } from '../config/api'
 
-const SMS_MOCK_STORAGE_KEY = 'cyber_sms_send_mock'
-
-function smsMockHeaders(): Record<string, string> {
-  if (window.localStorage.getItem(SMS_MOCK_STORAGE_KEY) === '1') {
-    return { 'X-SMS-Mock': '1' }
-  }
-  return {}
-}
-
 // ── 状态机阶段定义 ───────────────────────────────────────────
 type Phase =
   | 'boot'       // 开机打字动画
@@ -49,9 +40,6 @@ export function LoginTerminal({ onSuccess }: Props) {
   const [decodingLines, setDecodingLines] = useState<string[]>([])
   const [cyberName, setCyberName] = useState('')
   const [error, setError] = useState('')
-  const [smsMockEnabled, setSmsMockEnabled] = useState(
-    () => window.localStorage.getItem(SMS_MOCK_STORAGE_KEY) === '1',
-  )
   const [bootText, setBootText] = useState('')
   const [cursor, setCursor] = useState(true)
   const decodingRef = useRef<HTMLDivElement>(null)
@@ -97,6 +85,13 @@ export function LoginTerminal({ onSuccess }: Props) {
     }
   }, [phase, decodingLines])
 
+  // 进入验证码阶段：聚焦输入框，便于第一时间发现输入位置
+  useEffect(() => {
+    if (phase !== 'countdown') return
+    const id = window.setTimeout(() => codeInputRef.current?.focus(), 80)
+    return () => window.clearTimeout(id)
+  }, [phase])
+
   // 成功后：弹层模式回调，否则跳转 /chat
   useEffect(() => {
     if (phase !== 'success') return
@@ -115,11 +110,7 @@ export function LoginTerminal({ onSuccess }: Props) {
     const tel = phone.trim()
     if (tel.length < 6) { setError('>> ERROR: 终端号长度不足，信道拒绝建立'); return }
     try {
-      await axios.post(
-        `${API_AUTH_URL}/send-key`,
-        { phone_number: tel },
-        { headers: smsMockHeaders() },
-      )
+      await axios.post(`${API_AUTH_URL}/send-key`, { phone_number: tel })
       setPhase('countdown')
       setCountdown(60)
     } catch {
@@ -136,7 +127,6 @@ export function LoginTerminal({ onSuccess }: Props) {
       const res = await axios.post<{ token: string; cyber_name: string }>(
         `${API_AUTH_URL}/verify`,
         { phone_number: phone.trim(), sms_code: code.trim() },
-        { headers: smsMockHeaders() },
       )
       window.localStorage.setItem('cyber_token', res.data.token)
       window.localStorage.setItem('cyber_name', res.data.cyber_name)
@@ -196,25 +186,6 @@ export function LoginTerminal({ onSuccess }: Props) {
         {(phase === 'idle' || phase === 'countdown') && (
           <div className="terminal-body">
             <p className="terminal-hint">{'> [ 密钥接驳 ] 验证码登录通道'}</p>
-            <label className="terminal-sms-mock flex cursor-pointer items-start gap-2 text-sm text-[#9aefff]/90">
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-[#00f0ff]"
-                checked={smsMockEnabled}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  setSmsMockEnabled(on)
-                  if (on) {
-                    window.localStorage.setItem(SMS_MOCK_STORAGE_KEY, '1')
-                  } else {
-                    window.localStorage.removeItem(SMS_MOCK_STORAGE_KEY)
-                  }
-                }}
-              />
-              <span>
-                Mock 验证码（仅后端控制台输出密匙，不调用阿里云短信；校验需与此开关一致）
-              </span>
-            </label>
             <label className="terminal-label">
               {'> 请输入地球维度的通讯终端号 (Phone Number):'}
               <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>
@@ -241,35 +212,41 @@ export function LoginTerminal({ onSuccess }: Props) {
             </button>
 
             {phase === 'countdown' && (
-              <>
-                <label className="terminal-label mt-5">
-                  {'> 请输入 4 位跃迁密匙 (Auth Code):'}
+              <div className="terminal-verify-panel">
+                <p className="terminal-verify-panel-title">第二步 · 输入短信验证码</p>
+                <p className="terminal-verify-panel-hint">
+                  在下方框内输入收到的数字，然后点底部高亮按钮完成验证。
+                </p>
+                <label className="terminal-label terminal-label-verify" htmlFor="terminal-auth-code">
+                  {'> 跃迁密匙 (4 位数字)'}
                   <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>
                 </label>
                 <div
-                  className="terminal-code-hitbox"
+                  className="terminal-code-hitbox terminal-code-hitbox--prominent"
                   onClick={() => codeInputRef.current?.focus()}
                   role="presentation"
                 >
                   <input
+                    id="terminal-auth-code"
                     ref={codeInputRef}
-                    className="terminal-input tracking-[0.5em]"
+                    className="terminal-input terminal-input--auth-code"
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
                     maxLength={8}
                     value={code}
-                    placeholder="· · · ·"
+                    placeholder="点击此处输入"
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                   />
                 </div>
                 <button
                   type="button"
-                  className="terminal-btn mt-3"
+                  className="terminal-btn terminal-btn-verify"
                   onClick={handleVerify}
                 >
-                  {'[ 执行身份覆写 (Override) ]'}
+                  {'▶ 提交验证并登录'}
                 </button>
-              </>
+              </div>
             )}
 
             {error && <p className="terminal-error mt-3">{error}</p>}
