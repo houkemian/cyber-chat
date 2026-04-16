@@ -212,13 +212,9 @@ export function LoginTerminal({ onSuccess }: Props) {
             </button>
 
             {phase === 'countdown' && (
-              <div className="terminal-verify-panel">
-                <p className="terminal-verify-panel-title">第二步 · 输入短信验证码</p>
-                <p className="terminal-verify-panel-hint">
-                  在下方框内输入收到的数字，然后点底部高亮按钮完成验证。
-                </p>
-                <label className="terminal-label terminal-label-verify" htmlFor="terminal-auth-code">
-                  {'> 跃迁密匙 (4 位数字)'}
+              <>
+                <label className="terminal-label mt-5 terminal-label-verify" htmlFor="terminal-auth-code">
+                  {'> 请输入 4 位跃迁密匙 (Auth Code):'}
                   <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>
                 </label>
                 <div
@@ -235,18 +231,18 @@ export function LoginTerminal({ onSuccess }: Props) {
                     autoComplete="one-time-code"
                     maxLength={8}
                     value={code}
-                    placeholder="点击此处输入"
+                    placeholder="· · · ·"
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                   />
                 </div>
                 <button
                   type="button"
-                  className="terminal-btn terminal-btn-verify"
+                  className="terminal-btn mt-3 terminal-btn-verify"
                   onClick={handleVerify}
                 >
-                  {'▶ 提交验证并登录'}
+                  {'[ 执行身份覆写 (Override) ]'}
                 </button>
-              </div>
+              </>
             )}
 
             {error && <p className="terminal-error mt-3">{error}</p>}

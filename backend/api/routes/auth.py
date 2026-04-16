@@ -14,14 +14,6 @@ from utils.sms_service import sms_service
 router = APIRouter(tags=["auth"])
 
 
-def _sms_force_mock_from_request(request: Request) -> bool:
-    """客户端 X-SMS-Mock: 1 时强制走本地 Mock 短信（需配置 sms_mock_via_header）。"""
-    if not get_settings().sms_mock_via_header:
-        return False
-    raw = (request.headers.get("x-sms-mock") or "").strip().lower()
-    return raw in ("1", "true", "yes", "on")
-
-
 # ── content_moderation 依赖占位 ──────────────────────────────
 # 规约要求：所有接口广播前必须预留内容安全拦截点。
 # 当前为空实现，后续接入敏感词 / 风控 SDK 时仅需在此处填充。
@@ -60,7 +52,6 @@ async def _issue_auth_response(request: Request, phone_number: str) -> AuthRespo
 # ── 接口 1：POST /api/auth/send-key ─────────────────────────
 @router.post("/auth/send-key")
 async def send_key(
-    request: Request,
     payload: SendKeyRequest,
     _: None = Depends(content_moderation),
 ) -> dict:
@@ -68,7 +59,7 @@ async def send_key(
     向地球维度通讯终端发送跃迁密匙。
     MVP 阶段：密匙打印至后端控制台，前端直接读 log 即可测试。
     """
-    await sms_service.send_code(payload.phone_number, force_mock=_sms_force_mock_from_request(request))
+    await sms_service.send_code(payload.phone_number)
     # 不暴露密匙给前端，只告知"信道已建立"
     return {"ok": True, "message": "跃迁密匙已发送至终端信道"}
 
@@ -92,7 +83,6 @@ async def verify(
     is_valid = is_master_code or await sms_service.verify_code(
         payload.phone_number,
         payload.sms_code,
-        force_mock=_sms_force_mock_from_request(request),
     )
 
     if not is_valid:
