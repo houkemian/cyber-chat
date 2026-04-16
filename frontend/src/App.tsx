@@ -11,6 +11,12 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
 
+function isIosLike() {
+  const ua = window.navigator.userAgent.toLowerCase()
+  const touchMac = /macintosh/.test(ua) && 'ontouchend' in document
+  return /iphone|ipad|ipod/.test(ua) || touchMac
+}
+
 // ── 扩展头像池：保留像素人像 + 新增物件种子 ──────────────────
 // 前 4 个为像素人像（使用 pixel-art style），后续为物件风格
 const AVATAR_POOL = [
@@ -38,6 +44,7 @@ function App() {
   const [loginSeq, setLoginSeq] = useState(0)
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalledMode, setIsInstalledMode] = useState(false)
+  const [isIosDevice, setIsIosDevice] = useState(false)
   const [avatarIdx] = useState(() => {
     const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
     return saved ? Number(saved) : 0
@@ -91,6 +98,7 @@ function App() {
   }, [])
 
   useEffect(() => {
+    setIsIosDevice(isIosLike())
     const media = window.matchMedia('(display-mode: standalone)')
     const updateInstalledMode = () => {
       const standaloneByNavigator = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -142,14 +150,27 @@ function App() {
   }
 
   const handleInstallApp = useCallback(async () => {
-    if (!deferredInstallPrompt) return
-    await deferredInstallPrompt.prompt()
-    const choice = await deferredInstallPrompt.userChoice
-    if (choice.outcome === 'accepted') {
-      setIsInstalledMode(true)
+    if (deferredInstallPrompt) {
+      await deferredInstallPrompt.prompt()
+      const choice = await deferredInstallPrompt.userChoice
+      if (choice.outcome === 'accepted') {
+        setIsInstalledMode(true)
+      }
+      setDeferredInstallPrompt(null)
+      return
     }
-    setDeferredInstallPrompt(null)
-  }, [deferredInstallPrompt])
+    if (isIosDevice) {
+      window.alert(
+        'iOS 安装指引：\n1) 点击 Safari 底部分享按钮\n2) 选择“添加到主屏幕”\n3) 确认添加后即可从桌面启动 2000.exe',
+      )
+      return
+    }
+    window.alert(
+      '当前浏览器未触发安装弹窗。\n请确认：\n- 使用 HTTPS 域名访问\n- 已等待页面加载完成\n- 浏览器允许 PWA 安装（建议 Chrome/Edge）',
+    )
+  }, [deferredInstallPrompt, isIosDevice])
+
+  const showInstallButton = !isInstalledMode && (Boolean(deferredInstallPrompt) || isIosDevice)
 
   return (
     <div className="crt-container">
@@ -172,6 +193,15 @@ function App() {
                   <h1 className="title neon-flicker">2000.exe</h1>
                   <span className="tag-mobile">禁止实名，允许发疯。</span>
                 </div>
+                {showInstallButton && (
+                  <button
+                    type="button"
+                    className="auth-btn-install mt-2"
+                    onClick={() => { void handleInstallApp() }}
+                  >
+                    <span>[ 添加到桌面 ]</span>
+                  </button>
+                )}
               </div>
               <div className="auth-area">
                 {isLoggedIn ? (
@@ -194,15 +224,6 @@ function App() {
                   </div>
                 ) : (
                   <div className="auth-actions">
-                    {!isInstalledMode && deferredInstallPrompt && (
-                      <button
-                        type="button"
-                        className="auth-btn-install"
-                        onClick={() => { void handleInstallApp() }}
-                      >
-                        <span>[ 添加到桌面 ]</span>
-                      </button>
-                    )}
                     <button
                       type="button"
                       className="auth-btn-teleport"

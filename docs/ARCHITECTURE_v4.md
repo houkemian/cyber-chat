@@ -85,8 +85,8 @@
 | 优先级 | 任务 | 关键点 |
 |--------|------|--------|
 | P0 | 生产安全加固 | 移除万能密码 `0000`，轮换 `JWT_SECRET`，`CORS_ORIGINS` 精确注入 |
-| P1 | 短信验证登录（阿里云） | **已接入 Provider 抽象**：`SMS_PROVIDER=aliyun` 走阿里云短信发送，验证码校验与 JWT 签发链路已打通；待补：限流、防刷与审计 |
-| P1 | 手机无感登录（阿里云） | **已接入** `POST /api/auth/mobile/verify`：前端提交运营商 access_token，后端校验后签发 JWT；待补：前端运营商 SDK 正式接入与多端互斥策略 |
+| ~~P1~~ | ~~短信验证登录（阿里云）~~ | **已完成**：`SMS_PROVIDER=aliyun` 走阿里云短信发送，验证码校验与 JWT 签发链路已全链路上线 |
+| ~~P1~~ | ~~手机无感登录（阿里云）~~ | **已取消**：该能力不再推进，后续从产品与技术路线中移除 |
 | ~~P0~~ | ~~PostgreSQL 正式接入~~ | **已实现**：`asyncpg` 连接池 + `user_profiles/chat_messages` 自动建表 |
 | ~~P0~~ | ~~公告 API 化~~ | **已实现**：`GET /api/announcements`，数据经 `CacheManager`（内存默认，可切 Redis） |
 | ~~P1~~ | ~~成员列表 API 化~~ | **已实现**：`GET /api/ws/rooms/{room_id}/members` |

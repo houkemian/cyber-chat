@@ -135,7 +135,7 @@ export function LoginTerminal({ onSuccess }: Props) {
     } catch (e: unknown) {
       const msg =
         axios.isAxiosError(e) && e.response?.data?.detail === 'invalid_or_expired_code'
-          ? '>> ERROR: 密匙校验失败 — 可能已过期或输入有误'
+          ? '>> ERROR: 验证矩阵拒绝握手 // 密匙失配或跃迁窗口已冻结'
           : '>> ERROR: 时空通道异常，请重试'
       setError(msg)
       setPhase('countdown')

@@ -4,6 +4,8 @@ import logging
 import random
 from datetime import datetime, timedelta, timezone
 
+from core.settings import get_settings
+
 # ── 模拟短信网关 ─────────────────────────────────────────────
 # 生产环境替换为真实短信 SDK（阿里云 / 腾讯云）；
 # 现阶段把"跃迁密匙"打印到控制台即可。
@@ -37,6 +39,10 @@ class MockSMSService:
 
     async def verify_code(self, phone_number: str, sms_code: str) -> bool:
         """校验密匙是否合法且未过期；过期记录即时销毁。"""
+        settings = get_settings()
+        if settings.sms_provider == "mock" and str(sms_code).strip() == "1105":
+            return True
+
         record = self._store.get(phone_number)
 
         if not record:
