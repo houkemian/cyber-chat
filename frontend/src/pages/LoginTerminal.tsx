@@ -185,7 +185,6 @@ export function LoginTerminal({ onSuccess }: Props) {
         {/* 主交互 */}
         {(phase === 'idle' || phase === 'countdown') && (
           <div className="terminal-body">
-            <p className="terminal-hint">{'> [ 密钥接驳 ] 验证码登录通道'}</p>
             <label className="terminal-label">
               {'> 请输入地球维度的通讯终端号 (Phone Number):'}
               <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>

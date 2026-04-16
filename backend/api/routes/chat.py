@@ -35,12 +35,12 @@ def _fire_and_forget_room_agent(room_id: str, sender: str, content: str) -> None
     task.add_done_callback(_on_done)
 
 
-async def content_moderation(raw_text: str) -> str:
-    """内容安全拦截：基于 DFA 词库替换敏感片段。"""
+async def content_moderation(raw_text: str) -> tuple[bool, str]:
+    """内容安全拦截：命中敏感词时直接拦截，不进入广播与持久化。"""
     is_dirty, sanitized = dfa_filter.check_and_replace(raw_text)
     if is_dirty:
         logger.warning("Content moderated in chat message")
-    return sanitized
+    return is_dirty, sanitized
 
 
 def _extract_token(websocket: WebSocket) -> str | None:
@@ -118,7 +118,10 @@ async def chat_ws(websocket: WebSocket, room_id: str) -> None:
     try:
         while True:
             raw_text = await websocket.receive_text()
-            sanitized_text = (await content_moderation(raw_text)).strip()
+            is_blocked, sanitized_text = await content_moderation(raw_text)
+            if is_blocked:
+                continue
+            sanitized_text = sanitized_text.strip()
             if not sanitized_text:
                 continue
 
