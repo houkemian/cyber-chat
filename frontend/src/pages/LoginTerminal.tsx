@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { API_AUTH_URL } from '../config/api'
 
+const SMS_MOCK_STORAGE_KEY = 'cyber_sms_send_mock'
+
+function smsMockHeaders(): Record<string, string> {
+  if (window.localStorage.getItem(SMS_MOCK_STORAGE_KEY) === '1') {
+    return { 'X-SMS-Mock': '1' }
+  }
+  return {}
+}
+
 // ── 状态机阶段定义 ───────────────────────────────────────────
 type Phase =
   | 'boot'       // 开机打字动画
@@ -40,7 +49,9 @@ export function LoginTerminal({ onSuccess }: Props) {
   const [decodingLines, setDecodingLines] = useState<string[]>([])
   const [cyberName, setCyberName] = useState('')
   const [error, setError] = useState('')
-  const [silentLoading, setSilentLoading] = useState(false)
+  const [smsMockEnabled, setSmsMockEnabled] = useState(
+    () => window.localStorage.getItem(SMS_MOCK_STORAGE_KEY) === '1',
+  )
   const [bootText, setBootText] = useState('')
   const [cursor, setCursor] = useState(true)
   const decodingRef = useRef<HTMLDivElement>(null)
@@ -104,45 +115,15 @@ export function LoginTerminal({ onSuccess }: Props) {
     const tel = phone.trim()
     if (tel.length < 6) { setError('>> ERROR: 终端号长度不足，信道拒绝建立'); return }
     try {
-      await axios.post(`${API_AUTH_URL}/send-key`, { phone_number: tel })
+      await axios.post(
+        `${API_AUTH_URL}/send-key`,
+        { phone_number: tel },
+        { headers: smsMockHeaders() },
+      )
       setPhase('countdown')
       setCountdown(60)
     } catch {
       setError('>> ERROR: 信道被干扰，请稍后重试')
-    }
-  }
-
-  const handleSilentLogin = async () => {
-    setError('')
-    setSilentLoading(true)
-    try {
-      const globalToken = (window as Window & {
-        ALIYUN_MOBILE_ACCESS_TOKEN?: string
-      }).ALIYUN_MOBILE_ACCESS_TOKEN
-      const maybeToken = globalToken ?? window.prompt('请输入一键登录 access_token（本地调试可用 mock:13800138000）', '') ?? ''
-      const accessToken = maybeToken.trim()
-      if (!accessToken) {
-        setError('>> ERROR: 未获取到一键登录 token，请重试')
-        return
-      }
-      const res = await axios.post<{ token: string; cyber_name: string }>(
-        `${API_AUTH_URL}/mobile/verify`,
-        { access_token: accessToken },
-      )
-      window.localStorage.setItem('cyber_token', res.data.token)
-      window.localStorage.setItem('cyber_name', res.data.cyber_name)
-      setCyberName(res.data.cyber_name)
-      setPhase('decoding')
-      setDecodingLines(makeDecodingLines())
-      setTimeout(() => setPhase('success'), 1200)
-    } catch (e: unknown) {
-      const msg =
-        axios.isAxiosError(e) && e.response?.data?.detail === 'invalid_mobile_access_token'
-          ? '>> ERROR: 无感登录令牌校验失败'
-          : '>> ERROR: 无感登录通道异常，请稍后重试'
-      setError(msg)
-    } finally {
-      setSilentLoading(false)
     }
   }
 
@@ -155,6 +136,7 @@ export function LoginTerminal({ onSuccess }: Props) {
       const res = await axios.post<{ token: string; cyber_name: string }>(
         `${API_AUTH_URL}/verify`,
         { phone_number: phone.trim(), sms_code: code.trim() },
+        { headers: smsMockHeaders() },
       )
       window.localStorage.setItem('cyber_token', res.data.token)
       window.localStorage.setItem('cyber_name', res.data.cyber_name)
@@ -214,6 +196,25 @@ export function LoginTerminal({ onSuccess }: Props) {
         {(phase === 'idle' || phase === 'countdown') && (
           <div className="terminal-body">
             <p className="terminal-hint">{'> [ 密钥接驳 ] 验证码登录通道'}</p>
+            <label className="terminal-sms-mock flex cursor-pointer items-start gap-2 text-sm text-[#9aefff]/90">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-[#00f0ff]"
+                checked={smsMockEnabled}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setSmsMockEnabled(on)
+                  if (on) {
+                    window.localStorage.setItem(SMS_MOCK_STORAGE_KEY, '1')
+                  } else {
+                    window.localStorage.removeItem(SMS_MOCK_STORAGE_KEY)
+                  }
+                }}
+              />
+              <span>
+                Mock 验证码（仅后端控制台输出密匙，不调用阿里云短信；校验需与此开关一致）
+              </span>
+            </label>
             <label className="terminal-label">
               {'> 请输入地球维度的通讯终端号 (Phone Number):'}
               <span className={cursor ? 'opacity-100' : 'opacity-0'}>_</span>
@@ -270,20 +271,6 @@ export function LoginTerminal({ onSuccess }: Props) {
                 </button>
               </>
             )}
-
-            <div className="mt-6">
-              <p className="terminal-hint">{'> [ 静默越权 ] 无感登录通道'}</p>
-              <button
-                type="button"
-                className={`terminal-btn terminal-btn-override mt-3 ${silentLoading ? 'terminal-btn-disabled' : ''}`}
-                onClick={handleSilentLogin}
-                disabled={silentLoading}
-              >
-                {silentLoading
-                  ? '> 正在握手运营商无感信道...'
-                  : '>_ EXECUTE // 强制越权接入'}
-              </button>
-            </div>
 
             {error && <p className="terminal-error mt-3">{error}</p>}
           </div>

@@ -42,8 +42,12 @@ class SMSService:
     def _sms_code_key(phone_number: str) -> str:
         return f"sms:code:{phone_number}"
 
-    async def send_code(self, phone_number: str) -> None:
+    async def send_code(self, phone_number: str, *, force_mock: bool = False) -> None:
         settings = get_settings()
+        if force_mock:
+            await mock_sms_service.send_code(phone_number)
+            logger.warning("[SMS_FORCE_MOCK_SEND] ts=%s phone_number=%s", _log_ts(), phone_number)
+            return
         if settings.sms_provider == "aliyun":
             sent = await self._send_aliyun_code(phone_number)
             if sent:
@@ -51,8 +55,10 @@ class SMSService:
             logger.warning("[ALIYUN_SMS_FALLBACK] ts=%s msg=%s", _log_ts(), "aliyun sms send failed, fallback to mock provider")
         await mock_sms_service.send_code(phone_number)
 
-    async def verify_code(self, phone_number: str, sms_code: str) -> bool:
+    async def verify_code(self, phone_number: str, sms_code: str, *, force_mock: bool = False) -> bool:
         settings = get_settings()
+        if force_mock:
+            return await mock_sms_service.verify_code(phone_number, sms_code)
         if settings.sms_provider == "aliyun":
             return await self._check_aliyun_code(phone_number=phone_number, sms_code=sms_code)
         return await mock_sms_service.verify_code(phone_number, sms_code)

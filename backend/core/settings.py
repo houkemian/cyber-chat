@@ -33,6 +33,8 @@ class AppSettings:
     aliyun_sms_sign_name: str = ""
     aliyun_sms_template_code: str = ""
     mobile_login_provider: str = "mock"
+    # 允许客户端通过 X-SMS-Mock 头强制走本地 Mock 短信（不调阿里云）。生产可设为 0 关闭。
+    sms_mock_via_header: bool = True
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -95,6 +97,8 @@ class AppSettings:
             aliyun_sms_sign_name=os.getenv("ALIYUN_SMS_SIGN_NAME", "").strip(),
             aliyun_sms_template_code=os.getenv("ALIYUN_SMS_TEMPLATE_CODE", "").strip(),
             mobile_login_provider=os.getenv("MOBILE_LOGIN_PROVIDER", "mock").strip().lower(),
+            sms_mock_via_header=os.getenv("SMS_MOCK_VIA_HEADER", "1").strip().lower()
+            not in ("0", "false", "no", "off"),
         )
 
 
