@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.settings import get_settings
 from schemas.auth import AuthResponse, MobileVerifyRequest, SendKeyRequest, VerifyKeyRequest
+from utils.cyber_filter import dfa_filter
 from utils.generator import generate_cyber_name
 from utils.security import create_access_token
 from utils.mobile_auth_service import mobile_auth_service
@@ -14,11 +15,29 @@ from utils.sms_service import sms_service
 router = APIRouter(tags=["auth"])
 
 
-# ── content_moderation 依赖占位 ──────────────────────────────
-# 规约要求：所有接口广播前必须预留内容安全拦截点。
-# 当前为空实现，后续接入敏感词 / 风控 SDK 时仅需在此处填充。
-async def content_moderation() -> None:
-    pass
+# ── content_moderation 依赖 ─────────────────────────────────
+async def content_moderation(request: Request) -> None:
+    """
+    请求体内容安全拦截：
+    - 对字符串字段执行 DFA 检测
+    - 命中敏感词时拒绝请求
+    """
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/json" not in content_type:
+        return
+    try:
+        payload = await request.json()
+    except Exception:
+        return
+    if not isinstance(payload, dict):
+        return
+
+    for value in payload.values():
+        if not isinstance(value, str):
+            continue
+        is_dirty, _ = dfa_filter.check_and_replace(value)
+        if is_dirty:
+            raise HTTPException(status_code=400, detail="content_blocked")
 
 
 async def _issue_auth_response(request: Request, phone_number: str) -> AuthResponse:

@@ -170,7 +170,8 @@ function App() {
     )
   }, [deferredInstallPrompt, isIosDevice])
 
-  const showInstallButton = !isInstalledMode && (Boolean(deferredInstallPrompt) || isIosDevice)
+  // 兜底策略：未安装时始终展示入口，点击后再按平台能力分流
+  const showInstallButton = !isInstalledMode
 
   return (
     <div className="crt-container">

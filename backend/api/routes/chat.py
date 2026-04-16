@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, WebSocketE
 from core.settings import get_settings
 from models import RoomHistoryMessage, RoomMembersResponse
 from services.llm_agent import room_agent_manager
+from utils.cyber_filter import dfa_filter
 from utils.ws_manager import ws_manager
 
 router = APIRouter(tags=["chat"])
@@ -35,11 +36,11 @@ def _fire_and_forget_room_agent(room_id: str, sender: str, content: str) -> None
 
 
 async def content_moderation(raw_text: str) -> str:
-    """
-    内容安全拦截占位：
-    当前直通，后续可在此接入敏感词/风控 SDK。
-    """
-    return raw_text
+    """内容安全拦截：基于 DFA 词库替换敏感片段。"""
+    is_dirty, sanitized = dfa_filter.check_and_replace(raw_text)
+    if is_dirty:
+        logger.warning("Content moderated in chat message")
+    return sanitized
 
 
 def _extract_token(websocket: WebSocket) -> str | None:

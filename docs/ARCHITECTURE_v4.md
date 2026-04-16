@@ -94,7 +94,7 @@
 | P1 | H5 添加到桌面异常修复 | 当前部分机型/浏览器无法正常触发安装；补齐 HTTPS + Manifest + SW 生效链路校验，增加安装入口兜底（菜单引导/手动添加步骤）与埋点 |
 | P1 | AI 气氛组 Agent | `/backend/services/ai_agent.py`，与主鉴权链路隔离 |
 | P1 | 分区人格 LLM Agent | `backend/services/llm_agent.py`：`reply`→chat，`action`→system；带记忆折叠、超时/重试/熔断、单房间锁 |
-| P1 | 内容安全拦截 | 填充 `content_moderation`，接入风控或关键词 |
+| ~~P1~~ | ~~内容安全拦截~~ | **已实现**：接入 DFA 关键词过滤（`backend/utils/cyber_filter.py` + `backend/sensitive-stop-words`），聊天消息自动脱敏，鉴权请求命中敏感词直接拒绝 |
 | P2 | 历史消息分页 | `before_timestamp` / `cursor` |
 | P2 | 消息去重 | 切房时历史与 WS 重叠：`timestamp+sender+content` |
 | P2 | PWA / 离线缓存 | Service Worker |
