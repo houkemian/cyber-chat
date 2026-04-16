@@ -45,6 +45,7 @@ function App() {
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalledMode, setIsInstalledMode] = useState(false)
   const [isIosDevice, setIsIosDevice] = useState(false)
+  const [showAppQr, setShowAppQr] = useState(false)
   const [avatarIdx] = useState(() => {
     const saved = window.localStorage.getItem(AVATAR_STORAGE_KEY)
     return saved ? Number(saved) : 0
@@ -170,8 +171,7 @@ function App() {
     )
   }, [deferredInstallPrompt, isIosDevice])
 
-  // 兜底策略：未安装时始终展示入口，点击后再按平台能力分流
-  const showInstallButton = !isInstalledMode
+  const qrTargetUrl = window.location.origin
 
   return (
     <div className="crt-container">
@@ -194,15 +194,6 @@ function App() {
                   <h1 className="title neon-flicker">2000.exe</h1>
                   <span className="tag-mobile">禁止实名，允许发疯。</span>
                 </div>
-                {showInstallButton && (
-                  <button
-                    type="button"
-                    className="auth-btn-install mt-2"
-                    onClick={() => { void handleInstallApp() }}
-                  >
-                    <span>[ 添加到桌面 ]</span>
-                  </button>
-                )}
               </div>
               <div className="auth-area">
                 {isLoggedIn ? (
@@ -218,6 +209,14 @@ function App() {
                         <br />
                         {cyberName ?? 'ANON'}
                       </div>
+                      {!isInstalledMode && (
+                        <button type="button" className="user-menu-item" onClick={() => { void handleInstallApp() }}>
+                          {'部署到主屏幕 (Pin to Home)'}
+                        </button>
+                      )}
+                      <button type="button" className="user-menu-item" onClick={() => setShowAppQr(true)}>
+                        {'下载移动端矩阵 (Scan QR)'}
+                      </button>
                       <button type="button" className="user-menu-item" onClick={logout}>
                         {'终止当前进程 (Terminate PID)'}
                       </button>
@@ -267,6 +266,35 @@ function App() {
             </button>
             <div className="login-modal-content">
               <LoginTerminal onSuccess={handleLoginSuccess} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAppQr && (
+        <div className="login-modal-mask" onClick={(e) => {
+          if (e.target === e.currentTarget) setShowAppQr(false)
+        }}>
+          <div className="login-modal-box qr-modal-box">
+            <button
+              type="button"
+              className="login-modal-close"
+              onClick={() => setShowAppQr(false)}
+            >
+              ✕
+            </button>
+            <div className="login-modal-content qr-modal-content">
+              <div className="qr-modal-inner">
+                <p className="qr-modal-title">[ APP UPLINK PORTAL ]</p>
+                <p className="qr-modal-desc">扫描量子码，将 2000.exe 同步到你的移动终端。</p>
+                <div className="qr-shell" aria-label="下载APP二维码">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(qrTargetUrl)}`}
+                    alt="下载APP二维码"
+                  />
+                </div>
+                <p className="qr-modal-url">{qrTargetUrl}</p>
+              </div>
             </div>
           </div>
         </div>
