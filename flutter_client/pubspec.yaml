@@ -9,12 +9,40 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.2
+  shared_preferences: ^2.3.3
   web_socket_channel: ^3.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/2000_exe.png
+  fonts:
+    - family: PixelFont
+      fonts:
+        - asset: assets/fonts/fz_pixel_12.ttf
+
+# dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/images/2000_exe.png
+  adaptive_icon_background: "#C0C0C0"
+  adaptive_icon_foreground: assets/images/2000_exe.png
+
+# dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#C0C0C0"
+  image: assets/images/2000_exe.png
+  android: true
+  ios: false
+  android_12:
+    color: "#C0C0C0"
+    image: assets/images/2000_exe.png

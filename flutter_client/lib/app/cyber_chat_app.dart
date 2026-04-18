@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/theme.dart';
-import '../features/auth/presentation/pages/login_terminal_page.dart';
+import 'cyber_shell.dart';
 
 class CyberChatApp extends StatelessWidget {
   const CyberChatApp({super.key});
@@ -12,7 +12,7 @@ class CyberChatApp extends StatelessWidget {
       title: '2000.exe',
       debugShowCheckedModeBanner: false,
       theme: CyberTheme.darkTheme,
-      home: const LoginTerminalPage(),
+      home: const CyberShell(),
     );
   }
 }

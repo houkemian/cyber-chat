@@ -3,9 +3,20 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/storage/session_store.dart';
+import '../../data/auth_repository.dart';
+
 enum LoginPhase { boot, idle, countdown, decoding, success }
 
 class LoginTerminalController extends ChangeNotifier {
+  LoginTerminalController({
+    AuthRepository? authRepository,
+    this.onCompleted,
+  }) : _auth = authRepository ?? AuthRepository();
+
+  final AuthRepository _auth;
+  final void Function(String cyberName)? onCompleted;
+
   LoginPhase phase = LoginPhase.boot;
   String bootText = '';
   String phone = '';
@@ -17,6 +28,7 @@ class LoginTerminalController extends ChangeNotifier {
 
   Timer? _bootTimer;
   Timer? _countdownTimer;
+  Timer? _successTimer;
 
   void startBoot() {
     const target = '[ SYSTEM BOOT... 2000.exe ]';
@@ -48,16 +60,24 @@ class LoginTerminalController extends ChangeNotifier {
 
   Future<void> requestKey() async {
     error = '';
-    if (phone.trim().length < 6) {
+    final tel = phone.trim();
+    if (tel.length < 6) {
       error = '>> ERROR: 终端号长度不足，信道拒绝建立';
       notifyListeners();
       return;
     }
 
-    phase = LoginPhase.countdown;
-    countdown = 60;
-    _startCountdown();
-    notifyListeners();
+    try {
+      await _auth.sendKey(tel);
+      phase = LoginPhase.countdown;
+      countdown = 60;
+      _startCountdown();
+      notifyListeners();
+    } on AuthRepositoryException {
+      error = '>> ERROR: 信道被干扰，请稍后重试';
+      phase = LoginPhase.idle;
+      notifyListeners();
+    }
   }
 
   Future<void> verify() async {
@@ -72,10 +92,29 @@ class LoginTerminalController extends ChangeNotifier {
     decodingLines = _makeDecodingLines();
     notifyListeners();
 
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    cyberName = 'ANON_${Random().nextInt(9999).toString().padLeft(4, '0')}';
-    phase = LoginPhase.success;
-    notifyListeners();
+    try {
+      final result = await _auth.verify(
+        phoneNumber: phone.trim(),
+        smsCode: code.trim(),
+      );
+      await SessionStore.saveSession(token: result.token, cyberName: result.cyberName);
+      cyberName = result.cyberName;
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
+      phase = LoginPhase.success;
+      notifyListeners();
+      _successTimer?.cancel();
+      _successTimer = Timer(const Duration(milliseconds: 2000), () {
+        onCompleted?.call(cyberName);
+      });
+    } on AuthRepositoryException catch (e) {
+      if (e.message == 'invalid_or_expired_code') {
+        error = '>> ERROR: 验证矩阵拒绝握手 // 密匙失配或跃迁窗口已冻结';
+      } else {
+        error = '>> ERROR: 时空通道异常，请重试';
+      }
+      phase = LoginPhase.countdown;
+      notifyListeners();
+    }
   }
 
   void _startCountdown() {
@@ -118,6 +157,8 @@ class LoginTerminalController extends ChangeNotifier {
   void dispose() {
     _bootTimer?.cancel();
     _countdownTimer?.cancel();
+    _successTimer?.cancel();
+    _auth.dispose();
     super.dispose();
   }
 }

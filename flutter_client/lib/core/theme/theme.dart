@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+/// `pubspec.yaml` → `assets/fonts/fz_pixel_12.ttf`（方正像素12）
+class CyberFonts {
+  CyberFonts._();
+
+  static const String pixel = 'PixelFont';
+}
+
 class CyberPalette {
   CyberPalette._();
 
@@ -16,16 +23,26 @@ class CyberTheme {
   CyberTheme._();
 
   static ThemeData get darkTheme {
-    const baseText = TextStyle(
-      fontFamily: 'Courier',
+    final TextStyle baseText = TextStyle(
+      fontFamily: CyberFonts.pixel,
+      fontSize: 15,
       color: CyberPalette.terminalGreen,
-      letterSpacing: 0.35,
+      letterSpacing: 0.2,
+    );
+    final TextTheme scaled = ThemeData(brightness: Brightness.dark).textTheme.copyWith(
+      headlineMedium: const TextStyle(fontSize: 22),
+      titleLarge: const TextStyle(fontSize: 18),
+      bodyLarge: const TextStyle(fontSize: 15),
+      bodyMedium: const TextStyle(fontSize: 14),
+      bodySmall: const TextStyle(fontSize: 12),
+      labelLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
     );
 
     return ThemeData(
-      useMaterial3: true,
+      useMaterial3: false,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: CyberPalette.pureBlack,
+      fontFamily: CyberFonts.pixel,
       colorScheme: const ColorScheme.dark(
         primary: CyberPalette.terminalGreen,
         secondary: CyberPalette.neonCyan,
@@ -33,13 +50,10 @@ class CyberTheme {
         error: CyberPalette.danger,
         surface: CyberPalette.panelDark,
       ),
-      textTheme: const TextTheme(
-        headlineMedium: baseText,
-        titleLarge: baseText,
-        bodyLarge: baseText,
-        bodyMedium: baseText,
-        bodySmall: baseText,
-        labelLarge: baseText,
+      textTheme: scaled.apply(
+        fontFamily: CyberFonts.pixel,
+        bodyColor: CyberPalette.terminalGreen,
+        displayColor: CyberPalette.terminalGreen,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -49,16 +63,6 @@ class CyberTheme {
         enabledBorder: _inputBorder(CyberPalette.terminalGreen.withValues(alpha: 0.55)),
         focusedBorder: _inputBorder(CyberPalette.neonCyan),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: CyberPalette.frameDark,
-          foregroundColor: CyberPalette.terminalGreen,
-          textStyle: baseText.copyWith(fontWeight: FontWeight.w700),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-          side: const BorderSide(color: CyberPalette.terminalGreen, width: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
       ),
     );
   }
