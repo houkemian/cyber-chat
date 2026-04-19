@@ -1,9 +1,13 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../constants/avatar_pool.dart';
-import '../../core/constants/api_endpoints.dart';
+import '../../core/storage/session_store.dart';
 import '../../core/theme/pixel_style.dart';
 import '../../core/theme/theme.dart';
+import '../../features/auth/data/auth_repository.dart';
+import 'forge_identity_menu.dart';
 import 'pix_button.dart';
 import 'pixel_avatar_shell.dart';
 
@@ -17,8 +21,8 @@ class CyberHeaderBar extends StatefulWidget {
     required this.avatarIdx,
     required this.onTeleport,
     required this.onLogout,
-    required this.onShowQr,
-    required this.onPinToHome,
+    required this.onAvatarIdxSaved,
+    required this.onIdentityForged,
   });
 
   /// 为 true 时不绘制独立圆角卡片（由外层统一卡片包住），仅保留底部分隔。
@@ -29,8 +33,11 @@ class CyberHeaderBar extends StatefulWidget {
   final int avatarIdx;
   final VoidCallback onTeleport;
   final VoidCallback onLogout;
-  final VoidCallback onShowQr;
-  final VoidCallback onPinToHome;
+  /// 身份重构弹窗内保存新头像池下标（持久化由调用方负责）。
+  final Future<void> Function(int idx) onAvatarIdxSaved;
+
+  /// 「伪造新身份」成功后由 [SessionStore] 已写入新 token/网名，此处仅刷新 UI（如重建聊天会话）。
+  final Future<void> Function(String newCyberName) onIdentityForged;
 
   @override
   State<CyberHeaderBar> createState() => _CyberHeaderBarState();
@@ -195,15 +202,29 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
   /// 与 Web `--chat-panel-r-inset` 对齐（头像右缘与下方聊天面板右边框）。
   double get _chatPanelRightInset => 14 + 3 + 2 + 2;
 
+  Future<void> _forgeIdentityFromMenu() async {
+    final String? token = await SessionStore.readToken();
+    if (token == null || token.isEmpty) {
+      throw AuthRepositoryException('未登录');
+    }
+    final AuthRepository repo = AuthRepository();
+    try {
+      final AuthResult r = await repo.forgeIdentity(token: token);
+      await SessionStore.saveSession(token: r.token, cyberName: r.cyberName);
+      await widget.onIdentityForged(r.cyberName);
+    } finally {
+      repo.dispose();
+    }
+  }
+
   Widget _buildAvatarMenu() {
     final idx = widget.avatarIdx.clamp(0, kAvatarPool.length - 1);
     final entry = kAvatarPool[idx];
-    final seed = entry.seed == '__NAME__' ? (widget.cyberName?.trim().isNotEmpty == true ? widget.cyberName! : 'midnight') : entry.seed;
-    final url = dicebearPixelArtPngUrl(seed, size: 192);
+    final String? url = dicebearUrlForPoolEntry(entry, widget.cyberName, size: 192);
 
     return Material(
       color: Colors.transparent,
-      child: PopupMenuButton<String>(
+      child: PopupMenuButton<Object?>(
         offset: const Offset(0, 8),
         color: const Color(0xE80E1638),
         surfaceTintColor: Colors.transparent,
@@ -211,41 +232,46 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
           borderRadius: BorderRadius.zero,
           side: BorderSide(color: CyberPalette.neonCyan.withValues(alpha: 0.55)),
         ),
-        child: PixelAvatarShell(imageUrl: url),
-        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-          PopupMenuItem<String>(
-            enabled: false,
-            child: DefaultTextStyle(
-              style: PixelStyle.vt323(fontSize: 12, color: const Color(0xFF99F6E4), height: 1.45),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text('>> 当前身份密匙 (Uplink Key):'),
-                  Text(widget.cyberName ?? 'ANON', style: const TextStyle(color: Color(0xFFE0F2FE))),
-                ],
-              ),
-            ),
+        child: PixelAvatarShell(imageUrl: url, pixelEmoji: entry.pixelEmoji),
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<Object?>>[
+          IdentityForgeMenuEntry(
+            cyberName: widget.cyberName,
+            onForge: _forgeIdentityFromMenu,
           ),
           const PopupMenuDivider(height: 1),
-          PopupMenuItem<String>(
-            value: 'pin',
-            child: Text('部署到主屏幕 (Pin to Home)', style: PixelStyle.vt323(fontSize: 12)),
+          PopupMenuItem<Object?>(
+            value: 'identity',
+            child: Text('身份重构模块 (Identity)', style: PixelStyle.vt323(fontSize: 12)),
           ),
-          PopupMenuItem<String>(
-            value: 'qr',
-            child: Text('下载移动端矩阵 (Scan QR)', style: PixelStyle.vt323(fontSize: 12)),
-          ),
-          PopupMenuItem<String>(
+          PopupMenuItem<Object?>(
             value: 'out',
             child: Text('终止当前进程 (Terminate PID)', style: PixelStyle.vt323(fontSize: 12)),
           ),
         ],
-        onSelected: (String value) {
-          if (value == 'pin') widget.onPinToHome();
-          if (value == 'qr') widget.onShowQr();
+        onSelected: (Object? value) {
+          if (value == 'identity') {
+            _showIdentityModule(context);
+          }
           if (value == 'out') widget.onLogout();
         },
       ),
+    );
+  }
+
+  Future<void> _showIdentityModule(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      builder: (BuildContext ctx) {
+        return _IdentityRefactorDialog(
+          cyberName: widget.cyberName,
+          initialIdx: widget.avatarIdx,
+          onSave: (int idx) async {
+            await widget.onAvatarIdxSaved(idx);
+            if (ctx.mounted) Navigator.of(ctx).pop();
+          },
+        );
+      },
     );
   }
 
@@ -271,40 +297,131 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
   }
 }
 
-/// 简单二维码说明弹窗（对应 Web 扫码下载说明）。
-Future<void> showCyberQrDialog(BuildContext context) async {
-  final base = ApiEndpoints.httpBaseUrl;
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xF5070E24),
-      title: const Text('[ APP UPLINK PORTAL ]', style: TextStyle(fontFamily: 'Courier', fontSize: 15, letterSpacing: 2)),
-      content: SingleChildScrollView(
+/// 从头像池随机「重新生成」预览，确认后由 [onSave] 写回。
+class _IdentityRefactorDialog extends StatefulWidget {
+  const _IdentityRefactorDialog({
+    required this.cyberName,
+    required this.initialIdx,
+    required this.onSave,
+  });
+
+  final String? cyberName;
+  final int initialIdx;
+  final Future<void> Function(int idx) onSave;
+
+  @override
+  State<_IdentityRefactorDialog> createState() => _IdentityRefactorDialogState();
+}
+
+class _IdentityRefactorDialogState extends State<_IdentityRefactorDialog> {
+  late int _previewIdx;
+  final Random _rng = Random();
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _previewIdx = widget.initialIdx.clamp(0, kAvatarPool.length - 1);
+  }
+
+  void _regenerate() {
+    if (kAvatarPool.length <= 1) return;
+    setState(() {
+      int next = _previewIdx;
+      for (int k = 0; k < 32; k++) {
+        next = _rng.nextInt(kAvatarPool.length);
+        if (next != _previewIdx) break;
+      }
+      _previewIdx = next;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_previewIdx);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AvatarPoolEntry entry = kAvatarPool[_previewIdx.clamp(0, kAvatarPool.length - 1)];
+    final String? previewUrl = dicebearUrlForPoolEntry(entry, widget.cyberName, size: 192);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 340),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xF5081018),
+          border: Border.all(color: CyberPalette.neonCyan.withValues(alpha: 0.45)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text(
-              '扫描量子码，将 2000.exe 同步到你的移动终端。',
-              style: TextStyle(fontSize: 12, color: Color(0xFFC4B5FD)),
+            Text(
+              '身份重构模块 (Identity)',
+              style: PixelStyle.vt323(fontSize: 14, color: CyberPalette.neonCyan, fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              '从像素身份池随机重构 · 保存后同步顶栏头像',
+              style: PixelStyle.vt323(fontSize: 11, color: CyberPalette.terminalGreen.withValues(alpha: 0.58)),
+            ),
+            const SizedBox(height: 16),
             Center(
-              child: Image.network(
-                'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${Uri.encodeComponent(base)}',
-                width: 240,
-                height: 240,
-                errorBuilder: (_, __, ___) => const Text('[ QR 加载失败 ]', style: TextStyle(color: Color(0xFF93C5FD))),
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: PixelAvatarShell(imageUrl: previewUrl, pixelEmoji: entry.pixelEmoji, edgePx: 76),
               ),
             ),
-            const SizedBox(height: 8),
-            SelectableText(base, style: const TextStyle(fontSize: 12, color: Color(0xFF93C5FD))),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                PixButton(
+                  onTap: _regenerate,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF0A1218),
+                  topLeft: CyberPalette.neonPurple.withValues(alpha: 0.65),
+                  bottomRight: const Color(0xFF1A1020),
+                  child: Text('[ 重新生成 ]', style: PixelStyle.vt323(fontSize: 11, color: CyberPalette.neonCyan)),
+                ),
+                PixButton(
+                  onTap: _saving ? null : _save,
+                  enabled: !_saving,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF140A1C),
+                  topLeft: CyberPalette.neonCyan.withValues(alpha: 0.75),
+                  bottomRight: CyberPalette.neonPurple.withValues(alpha: 0.65),
+                  child: Text(
+                    _saving ? '[ ... ]' : '[ 保存 ]',
+                    style: PixelStyle.vt323(fontSize: 12, color: CyberPalette.terminalGreen),
+                  ),
+                ),
+                PixButton(
+                  onTap: _saving ? null : () => Navigator.of(context).pop(),
+                  enabled: !_saving,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF151018),
+                  topLeft: const Color(0xFF553366),
+                  bottomRight: const Color(0xFF220022),
+                  child: Text('[ 关闭 ]', style: PixelStyle.vt323(fontSize: 12, color: const Color(0xFF8899AA))),
+                ),
+              ],
+            ),
           ],
         ),
       ),
-      actions: <Widget>[
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭')),
-      ],
-    ),
-  );
+    );
+  }
 }

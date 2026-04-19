@@ -62,14 +62,6 @@ class _CyberShellState extends State<CyberShell> {
     });
   }
 
-  void _onPinToHome(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('本端为原生客户端；Web 请在浏览器中使用「安装应用 / 添加到主屏幕」。'),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
@@ -105,11 +97,25 @@ class _CyberShellState extends State<CyberShell> {
                           avatarIdx: _avatarIdx,
                           onTeleport: () => setState(() => _showLogin = true),
                           onLogout: _onLogout,
-                          onShowQr: () => showCyberQrDialog(context),
-                          onPinToHome: () => _onPinToHome(context),
+                          onAvatarIdxSaved: (int idx) async {
+                            await SessionStore.saveCyberAvatarIdx(idx);
+                            if (!mounted) return;
+                            setState(() => _avatarIdx = idx);
+                          },
+                          onIdentityForged: (String newCyberName) async {
+                            if (!mounted) return;
+                            setState(() {
+                              _cyberName = newCyberName;
+                              _roomSessionSeq += 1;
+                            });
+                          },
                         ),
                         Expanded(
-                          child: RoomChatPage(key: ValueKey<int>(_roomSessionSeq)),
+                          child: RoomChatPage(
+                            key: ValueKey<int>(_roomSessionSeq),
+                            avatarIdx: _avatarIdx,
+                            shellCyberName: _cyberName,
+                          ),
                         ),
                       ],
                     ),

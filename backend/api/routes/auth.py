@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import jwt
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from core.settings import get_settings
 from schemas.auth import AuthResponse, MobileVerifyRequest, SendKeyRequest, VerifyKeyRequest
@@ -66,6 +67,57 @@ async def _issue_auth_response(request: Request, phone_number: str) -> AuthRespo
         expires_delta=timedelta(hours=24),
     )
     return AuthResponse(token=token, cyber_name=cyber_name)
+
+
+def _parse_bearer_token(authorization: str | None) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="missing_token")
+    return authorization[7:].strip()
+
+
+# ── 接口 0：POST /api/auth/forge-identity ────────────────────
+@router.post("/auth/forge-identity", response_model=AuthResponse)
+async def forge_identity(
+    request: Request,
+    authorization: str | None = Header(None),
+) -> AuthResponse:
+    """
+    已登录用户伪造新身份：使用 generator.generate_cyber_name() 写入档案并重新签发 JWT。
+    """
+    token_str = _parse_bearer_token(authorization)
+    secret_key = get_settings().jwt_secret
+    try:
+        payload = jwt.decode(token_str, secret_key, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+    phone_number = payload.get("phone_number")
+    if not isinstance(phone_number, str) or not phone_number.strip():
+        raise HTTPException(status_code=401, detail="invalid_token")
+    phone_number = phone_number.strip()
+
+    new_name = generate_cyber_name()
+    db_manager = request.app.state.db
+    existing = await db_manager.get_user_cyber_name(phone_number=phone_number)
+    if existing is None:
+        await db_manager.create_user_profile(phone_number=phone_number, cyber_name=new_name)
+    else:
+        updated = await db_manager.update_user_cyber_name(
+            phone_number=phone_number,
+            cyber_name=new_name,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="identity_update_failed")
+
+    new_token = create_access_token(
+        secret_key=secret_key,
+        payload={
+            "phone_number": phone_number,
+            "cyber_name": new_name,
+        },
+        expires_delta=timedelta(hours=24),
+    )
+    return AuthResponse(token=new_token, cyber_name=new_name)
 
 
 # ── 接口 1：POST /api/auth/send-key ─────────────────────────

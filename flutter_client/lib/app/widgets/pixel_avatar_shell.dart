@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/theme.dart';
+import 'pixel_emoji_avatar.dart';
 
 /// 对齐 H5 头像壳 + CRT 扫描线 + 轻噪点；全直角、硬边投影（无模糊光晕）。
+///
+/// [imageUrl] 与 [pixelEmoji] 二选一：DiceBear 网络图 **或** 像素栅格化 Emoji。
 class PixelAvatarShell extends StatefulWidget {
-  const PixelAvatarShell({
+  PixelAvatarShell({
     super.key,
-    required this.imageUrl,
+    this.imageUrl,
+    this.pixelEmoji,
     this.edgePx = 40,
-  });
+  }) : assert(
+          (imageUrl != null && imageUrl.isNotEmpty) != (pixelEmoji != null && pixelEmoji.trim().isNotEmpty),
+        );
 
-  final String imageUrl;
+  final String? imageUrl;
+  final String? pixelEmoji;
   final double edgePx;
 
   @override
@@ -39,9 +46,25 @@ class _PixelAvatarShellState extends State<PixelAvatarShell> with SingleTickerPr
     Offset(1, 1),
   ];
 
+  Widget _baseRaster(double innerPx) {
+    final String? emoji = widget.pixelEmoji?.trim();
+    if (emoji != null && emoji.isNotEmpty) {
+      return PixelatedEmojiAvatar(emoji: emoji, size: innerPx, showFrame: false);
+    }
+    return Image.network(
+      widget.imageUrl!,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.none,
+      cacheWidth: 192,
+      cacheHeight: 192,
+      errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xCC11152D)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double s = widget.edgePx;
+    final double innerPx = (s - 2).clamp(8.0, 512.0);
 
     return AnimatedBuilder(
       animation: _grain,
@@ -82,14 +105,7 @@ class _PixelAvatarShellState extends State<PixelAvatarShell> with SingleTickerPr
                       child: Stack(
                         fit: StackFit.expand,
                         children: <Widget>[
-                          Image.network(
-                            widget.imageUrl,
-                            fit: BoxFit.cover,
-                            filterQuality: FilterQuality.none,
-                            cacheWidth: 192,
-                            cacheHeight: 192,
-                            errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xCC11152D)),
-                          ),
+                          _baseRaster(innerPx),
                           const Positioned.fill(child: CustomPaint(painter: _CrtScanlineMaskPainter())),
                           Positioned.fill(
                             child: Transform.translate(

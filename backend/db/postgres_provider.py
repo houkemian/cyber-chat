@@ -81,6 +81,21 @@ class PostgresProvider(DatabaseProvider):
             )
         return result.endswith("1")
 
+    async def update_user_cyber_name(self, *, phone_number: str, cyber_name: str) -> bool:
+        if self._pool is None:
+            return False
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                UPDATE user_profiles SET cyber_name = $1
+                WHERE phone_number = $2
+                RETURNING phone_number
+                """,
+                cyber_name,
+                phone_number,
+            )
+        return row is not None
+
     async def save_chat_message(
         self,
         *,

@@ -17,22 +17,36 @@ function isIosLike() {
   return /iphone|ipad|ipod/.test(ua) || touchMac
 }
 
-// ── 扩展头像池：保留像素人像 + 新增物件种子 ──────────────────
-// 前 4 个为像素人像（使用 pixel-art style），后续为物件风格
-const AVATAR_POOL = [
-  // 像素人像（以 cyberName 为动态种子，此处用占位符 __NAME__）
-  { seed: '__NAME__', label: '身份像', icon: '👤' },
-  // 物件头像
-  { seed: 'mini-red-umbrella-2000', label: '小雨伞', icon: '☂️' },
-  { seed: 'cactus-pixel-verde', label: '仙人掌', icon: '🌵' },
-  { seed: 'retro-computer-9x-boot', label: '小电脑', icon: '💻' },
-  { seed: 'floppy-disk-cyber-wave', label: '磁碟片', icon: '💾' },
-  { seed: 'gameboy-neon-blink-99', label: '游戏机', icon: '🎮' },
-  { seed: 'satellite-orbit-signal', label: '卫星锅', icon: '📡' },
-  { seed: 'coffee-mug-terminal-hot', label: '咖啡杯', icon: '☕' },
-  { seed: 'alien-capsule-static', label: '外星舱', icon: '🛸' },
-  { seed: 'cassette-tape-rewind88', label: '磁带机', icon: '📼' },
-  { seed: 'pixel-robot-unit-zero', label: '机器人', icon: '🤖' },
+// ── 头像池：与 flutter_client `avatar_pool.dart` 对齐 ─────────────────
+// pixel-art 仅生成人像；物件/萌物用 shapes / bottts / fun-emoji，避免「标签是磁带却显示人脸」。
+type AvatarEntry = { seed: string; label: string; icon: string; style: string }
+
+const AVATAR_POOL: AvatarEntry[] = [
+  { seed: '__NAME__', label: '身份像', icon: '👤', style: 'pixel-art' },
+  { seed: 'mini-red-umbrella-2000', label: '小雨伞', icon: '☂️', style: 'shapes' },
+  { seed: 'cactus-pixel-verde', label: '仙人掌', icon: '🌵', style: 'shapes' },
+  { seed: 'retro-computer-9x-boot', label: '小电脑', icon: '💻', style: 'shapes' },
+  { seed: 'floppy-disk-cyber-wave', label: '磁碟片', icon: '💾', style: 'shapes' },
+  { seed: 'gameboy-neon-blink-99', label: '游戏机', icon: '🎮', style: 'shapes' },
+  { seed: 'satellite-orbit-signal', label: '卫星锅', icon: '📡', style: 'shapes' },
+  { seed: 'coffee-mug-terminal-hot', label: '咖啡杯', icon: '☕', style: 'shapes' },
+  { seed: 'alien-capsule-static', label: '外星舱', icon: '🛸', style: 'shapes' },
+  { seed: 'cassette-tape-rewind88', label: '磁带机', icon: '📼', style: 'shapes' },
+  { seed: 'nokia-y2k-snake-phone', label: '诺基亚', icon: '📱', style: 'shapes' },
+  { seed: 'tamagotchi-virtual-pet-99', label: '电子鸡', icon: '🥚', style: 'shapes' },
+  { seed: 'vhs-linear-track-spool', label: '录像带', icon: '📼', style: 'shapes' },
+  { seed: 'cd-walkman-skip-proof', label: '随身听', icon: '🎧', style: 'shapes' },
+  { seed: 'dial-up-modem-handshake', label: '猫叫上网', icon: '📞', style: 'shapes' },
+  { seed: 'neon-pager-beep-1999', label: '寻呼机', icon: '📟', style: 'shapes' },
+  { seed: 'y2k-digicam-movie-mode', label: '数码相机', icon: '📷', style: 'shapes' },
+  { seed: 'neon-floppy-diskette-pink', label: '粉软盘', icon: '💾', style: 'shapes' },
+  { seed: 'transparent-skeleton-keychain', label: '透明挂坠', icon: '🔑', style: 'shapes' },
+  { seed: 'pixel-robot-unit-zero', label: '机器人', icon: '🤖', style: 'bottts' },
+  { seed: 'rubber-duck-bath-y2k', label: '小黄鸭', icon: '🐤', style: 'fun-emoji' },
+  { seed: 'yellow-chick-peep-spring', label: '小鸡', icon: '🐥', style: 'fun-emoji' },
+  { seed: 'tiny-bunny-meadow-hop', label: '小兔', icon: '🐰', style: 'fun-emoji' },
+  { seed: 'hamster-cheek-fluff', label: '仓鼠', icon: '🐹', style: 'fun-emoji' },
+  { seed: 'penguin-waddle-cute', label: '小企鹅', icon: '🐧', style: 'fun-emoji' },
 ]
 
 function App() {
@@ -53,11 +67,12 @@ function App() {
   const headerRef = useRef<HTMLElement>(null)
   const navigate = useNavigate()
 
-  const currentAvatarEntry = AVATAR_POOL[avatarIdx] ?? AVATAR_POOL[0]
+  const safeAvatarIdx = Math.min(Math.max(0, avatarIdx), AVATAR_POOL.length - 1)
+  const currentAvatarEntry = AVATAR_POOL[safeAvatarIdx] ?? AVATAR_POOL[0]
   const avatarSeed = currentAvatarEntry.seed === '__NAME__'
     ? (cyberName ?? 'midnight')
     : currentAvatarEntry.seed
-  const avatarUrl = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`
+  const avatarUrl = `https://api.dicebear.com/9.x/${currentAvatarEntry.style}/svg?seed=${encodeURIComponent(avatarSeed)}`
 
   // 动态计算聊天区精确高度：视口高度 - header高度 - container上下padding - gap
   useEffect(() => {

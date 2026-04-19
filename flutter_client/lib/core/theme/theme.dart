@@ -64,6 +64,12 @@ class CyberTheme {
         focusedBorder: _inputBorder(CyberPalette.neonCyan),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
+      snackBarTheme: SnackBarThemeData(
+        contentTextStyle: baseText.copyWith(fontSize: 14),
+      ),
+      tooltipTheme: TooltipThemeData(
+        textStyle: baseText.copyWith(fontSize: 12, color: const Color(0xFFE0F2FE)),
+      ),
     );
   }
 

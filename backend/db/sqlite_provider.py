@@ -92,6 +92,16 @@ class SQLiteProvider(DatabaseProvider):
         self._conn.commit()
         return cursor.rowcount == 1
 
+    async def update_user_cyber_name(self, *, phone_number: str, cyber_name: str) -> bool:
+        if self._conn is None:
+            return False
+        cursor = self._conn.execute(
+            "UPDATE user_profiles SET cyber_name = ? WHERE phone_number = ?",
+            (cyber_name, phone_number),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
     async def save_chat_message(
         self,
         *,

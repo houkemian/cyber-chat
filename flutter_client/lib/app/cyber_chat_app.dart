@@ -12,6 +12,13 @@ class CyberChatApp extends StatelessWidget {
       title: '2000.exe',
       debugShowCheckedModeBanner: false,
       theme: CyberTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      builder: (BuildContext context, Widget? child) {
+        return DefaultTextStyle(
+          style: const TextStyle(fontFamily: CyberFonts.pixel),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const CyberShell(),
     );
   }

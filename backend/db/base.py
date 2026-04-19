@@ -32,6 +32,11 @@ class DatabaseProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def update_user_cyber_name(self, *, phone_number: str, cyber_name: str) -> bool:
+        """更新已有档案的赛博名；成功更新至少一行返回 True。"""
+        raise NotImplementedError
+
+    @abstractmethod
     async def save_chat_message(
         self,
         *,

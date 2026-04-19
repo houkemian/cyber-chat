@@ -37,6 +37,12 @@ class SessionStore {
     await prefs.remove(keyCyberName);
   }
 
+  /// 持久化头像池下标，与 Web `AVATAR_STORAGE_KEY` 一致。
+  static Future<void> saveCyberAvatarIdx(int idx) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(keyCyberAvatarIdx, idx);
+  }
+
   static Future<void> ensureCfsUplinkStamp() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getString(keyCfsUplinkIso) != null) return;

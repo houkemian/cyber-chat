@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/constants/avatar_pool.dart';
+import '../../../../app/widgets/pixel_emoji_avatar.dart';
 import '../../../../app/widgets/pix_button.dart';
 import '../../../../core/storage/session_store.dart';
 import '../../../../core/theme/pixel_style.dart';
@@ -14,7 +16,17 @@ import '../controllers/room_chat_controller.dart';
 import '../utils/chat_clock.dart';
 
 class RoomChatPage extends StatefulWidget {
-  const RoomChatPage({super.key});
+  const RoomChatPage({
+    super.key,
+    this.avatarIdx = 0,
+    this.shellCyberName,
+  });
+
+  /// 与 [CyberHeaderBar] 同步；用于聊天行「本人」头像与顶栏一致。
+  final int avatarIdx;
+
+  /// 当前登录赛博名；与 [SessionStore] 一致时用于判定本人消息。
+  final String? shellCyberName;
 
   @override
   State<RoomChatPage> createState() => _RoomChatPageState();
@@ -40,7 +52,7 @@ class _RoomChatPageState extends State<RoomChatPage> {
 
   Future<void> _bootstrap() async {
     _token = (await SessionStore.readToken()) ?? '';
-    _cyberName = (await SessionStore.readCyberName()) ?? 'ANON';
+    _cyberName = widget.shellCyberName ?? (await SessionStore.readCyberName()) ?? 'ANON';
     _controller = RoomChatController(
       roomId: _roomId,
       cyberName: _cyberName,
@@ -52,6 +64,16 @@ class _RoomChatPageState extends State<RoomChatPage> {
     setState(() {
       _loadingShell = false;
     });
+  }
+
+  @override
+  void didUpdateWidget(RoomChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shellCyberName != oldWidget.shellCyberName &&
+        widget.shellCyberName != null &&
+        widget.shellCyberName!.trim().isNotEmpty) {
+      _cyberName = widget.shellCyberName!;
+    }
   }
 
   void _onRoomTick() {
@@ -170,6 +192,8 @@ class _RoomChatPageState extends State<RoomChatPage> {
                             tokens: tokens,
                             channelOnline: _controller.channelState == 'online',
                             onlineCount: _controller.onlineCount,
+                            selfAvatarIdx: widget.avatarIdx,
+                            selfCyberName: widget.shellCyberName ?? _cyberName,
                           ),
                         ),
                         if (_controller.isHistorySyncing)
@@ -406,14 +430,14 @@ class _AnnouncementStripState extends State<_AnnouncementStrip> {
                 Text(
                   'BROADCAST://SIGNAL',
                   style: TextStyle(
-                    fontFamily: 'Courier',
+                    fontFamily: CyberFonts.pixel,
                     fontSize: 10,
                     letterSpacing: 2,
                     color: widget.tokens.neonPrimary.withValues(alpha: 0.88),
                   ),
                 ),
                 const Spacer(),
-                Text('◈ ALERT', style: TextStyle(fontFamily: 'Courier', fontSize: 10, color: Colors.orange.shade700)),
+                Text('◈ ALERT', style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 10, color: Colors.orange.shade700)),
               ],
             ),
           ),
@@ -431,7 +455,7 @@ class _AnnouncementStripState extends State<_AnnouncementStrip> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'Courier',
+                        fontFamily: CyberFonts.pixel,
                         fontSize: 11,
                         height: 1.45,
                         color: widget.tokens.neonPrimary.withValues(alpha: 0.9),
@@ -480,7 +504,7 @@ class _SystemFeed extends StatelessWidget {
                 ? const Center(
                     child: Text(
                       '[系统提示] 暂无系统信号',
-                      style: TextStyle(fontFamily: 'Courier', fontSize: 12, color: Color(0xB8FDE68A)),
+                      style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 12, color: Color(0xB8FDE68A)),
                     ),
                   )
                 : ListView.builder(
@@ -504,6 +528,8 @@ class _UserStream extends StatelessWidget {
     required this.tokens,
     required this.channelOnline,
     required this.onlineCount,
+    required this.selfAvatarIdx,
+    required this.selfCyberName,
   });
 
   final ScrollController scroll;
@@ -512,6 +538,8 @@ class _UserStream extends StatelessWidget {
   final RoomThemeTokens tokens;
   final bool channelOnline;
   final int onlineCount;
+  final int selfAvatarIdx;
+  final String selfCyberName;
 
   @override
   Widget build(BuildContext context) {
@@ -520,7 +548,15 @@ class _UserStream extends StatelessWidget {
 
     final bodyChildren = <Widget>[];
     for (var i = 0; i < messages.length; i += 1) {
-      bodyChildren.add(_ChatLine(msg: messages[i], index: i, tokens: tokens));
+      bodyChildren.add(
+        _ChatLine(
+          msg: messages[i],
+          index: i,
+          tokens: tokens,
+          selfAvatarIdx: selfAvatarIdx,
+          selfCyberName: selfCyberName,
+        ),
+      );
       if (showDivider && i == lastHistoryIdx) {
         bodyChildren.add(
           const Padding(
@@ -529,7 +565,7 @@ class _UserStream extends StatelessWidget {
               child: Text(
                 'DATA ECHO · 数据残响 ▾',
                 style: TextStyle(
-                  fontFamily: 'Courier',
+                  fontFamily: CyberFonts.pixel,
                   fontSize: 10,
                   letterSpacing: 3,
                   color: Color(0xBFC026D3),
@@ -562,7 +598,7 @@ class _UserStream extends StatelessWidget {
                 ? const Center(
                     child: Text(
                       '[系统提示] 正在接入扇区主干网络...',
-                      style: TextStyle(fontFamily: 'Courier', fontSize: 12, color: Color(0xFF6B7280)),
+                      style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 12, color: Color(0xFF6B7280)),
                     ),
                   )
                 : ListView(
@@ -617,7 +653,7 @@ class _PanelHeader extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontFamily: 'Courier',
+              fontFamily: CyberFonts.pixel,
               fontSize: 11,
               letterSpacing: 4,
               color: accent.withValues(alpha: 0.95),
@@ -625,9 +661,9 @@ class _PanelHeader extends StatelessWidget {
           ),
           const Spacer(),
           if (trailing != null)
-            Text(trailing!, style: const TextStyle(fontFamily: 'Courier', fontSize: 10, color: Color(0xBF67E8F9))),
+            Text(trailing!, style: const TextStyle(fontFamily: CyberFonts.pixel, fontSize: 10, color: Color(0xBF67E8F9))),
           const SizedBox(width: 8),
-          Text(badge, style: TextStyle(fontFamily: 'Courier', fontSize: 10, color: accent.withValues(alpha: 0.8))),
+          Text(badge, style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 10, color: accent.withValues(alpha: 0.8))),
         ],
       ),
     );
@@ -654,17 +690,17 @@ class _SystemLine extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   '[${formatChatClock(msg.timestamp)}]',
-                  style: const TextStyle(fontFamily: 'Courier', fontSize: 10, color: Color(0xBF94A3B8)),
+                  style: const TextStyle(fontFamily: CyberFonts.pixel, fontSize: 10, color: Color(0xBF94A3B8)),
                 ),
                 const SizedBox(width: 6),
-                const Text('CFS', style: TextStyle(fontFamily: 'Courier', fontSize: 9, color: Color(0xE622D3EE))),
+                const Text('CFS', style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 9, color: Color(0xE622D3EE))),
               ],
             ),
             const SizedBox(height: 4),
             SelectableText(
               msg.content,
               style: const TextStyle(
-                fontFamily: 'Courier',
+                fontFamily: CyberFonts.pixel,
                 fontSize: 9,
                 height: 1.38,
                 color: Color(0xE5FDE68A),
@@ -697,7 +733,7 @@ class _SystemLine extends StatelessWidget {
       ),
       child: RichText(
         text: TextSpan(
-          style: TextStyle(fontFamily: 'Courier', fontSize: 11, color: tokens.terminalAmber.withValues(alpha: 0.88)),
+          style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 11, color: tokens.terminalAmber.withValues(alpha: 0.88)),
           children: <InlineSpan>[
             TextSpan(text: '$icon ', style: TextStyle(color: join ? const Color(0xDE86EFAC) : const Color(0xDFF87171))),
             TextSpan(
@@ -712,16 +748,106 @@ class _SystemLine extends StatelessWidget {
   }
 }
 
+/// 聊天行头像：他人用昵称种子 pixel-art；本人与顶栏 [kAvatarPool] / [dicebearUrlForPoolEntry] 一致。
+class _ChatLineAvatar extends StatelessWidget {
+  const _ChatLineAvatar({
+    required this.displayName,
+    required this.size,
+    required this.selfCyberName,
+    required this.selfAvatarIdx,
+  });
+
+  final String displayName;
+  final double size;
+  final String selfCyberName;
+  final int selfAvatarIdx;
+
+  bool get _isSelf {
+    final String a = displayName.trim();
+    final String b = selfCyberName.trim();
+    return a.isNotEmpty && b.isNotEmpty && a == b;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double s = size.clamp(12, 48);
+    if (_isSelf) {
+      final int idx = selfAvatarIdx.clamp(0, kAvatarPool.length - 1);
+      final AvatarPoolEntry entry = kAvatarPool[idx];
+      final String? url = dicebearUrlForPoolEntry(entry, selfCyberName, size: 96);
+      final String? emoji = entry.pixelEmoji?.trim();
+      if (emoji != null && emoji.isNotEmpty) {
+        return SizedBox(
+          width: s,
+          height: s,
+          child: DecoratedBox(
+            decoration: BoxDecoration(border: Border.all(color: const Color(0xFF334455), width: 1)),
+            child: PixelatedEmojiAvatar(emoji: emoji, size: s, showFrame: false),
+          ),
+        );
+      }
+      final String u = url ?? dicebearPixelArtPngUrl(selfCyberName, size: 96);
+      return SizedBox(
+        width: s,
+        height: s,
+        child: DecoratedBox(
+          decoration: BoxDecoration(border: Border.all(color: const Color(0xFF334455), width: 1)),
+          child: Image.network(
+            u,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.none,
+            gaplessPlayback: true,
+            cacheWidth: 96,
+            cacheHeight: 96,
+            errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1A1520)),
+          ),
+        ),
+      );
+    }
+
+    final String name = displayName.trim().isEmpty ? 'ANON' : displayName.trim();
+    final String url = dicebearPixelArtPngUrl(name, size: 96);
+    return SizedBox(
+      width: s,
+      height: s,
+      child: DecoratedBox(
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xFF334455), width: 1)),
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.none,
+          gaplessPlayback: true,
+          cacheWidth: 96,
+          cacheHeight: 96,
+          errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1A1520)),
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatLine extends StatelessWidget {
-  const _ChatLine({required this.msg, required this.index, required this.tokens});
+  const _ChatLine({
+    required this.msg,
+    required this.index,
+    required this.tokens,
+    required this.selfAvatarIdx,
+    required this.selfCyberName,
+  });
 
   final UiChatMessage msg;
   final int index;
   final RoomThemeTokens tokens;
+  final int selfAvatarIdx;
+  final String selfCyberName;
+
+  static const double _nameFontSize = 12;
+  static const double _avatarSize = 20;
 
   @override
   Widget build(BuildContext context) {
     final odd = index.isOdd;
+    final String displayName = msg.sender ?? 'ANON';
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: EdgeInsets.fromLTRB(odd ? 10 : 8, 6, 8, 7),
@@ -735,28 +861,42 @@ class _ChatLine extends StatelessWidget {
         ),
         color: odd ? tokens.neonSecondary.withValues(alpha: 0.06) : Colors.transparent,
       ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontFamily: 'Courier', height: 1.65),
-          children: <InlineSpan>[
-            TextSpan(
-              text: '${msg.sender ?? 'ANON'} ',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: odd ? tokens.neonSecondary : tokens.neonPrimary,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          _ChatLineAvatar(
+            displayName: displayName,
+            size: _avatarSize,
+            selfCyberName: selfCyberName,
+            selfAvatarIdx: selfAvatarIdx,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontFamily: CyberFonts.pixel, height: 1.65),
+                children: <InlineSpan>[
+                  TextSpan(
+                    text: '$displayName ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: _nameFontSize,
+                      color: odd ? tokens.neonSecondary : tokens.neonPrimary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '[${formatChatClock(msg.timestamp)}] ',
+                    style: const TextStyle(fontSize: 11, color: Color(0xD964748B)),
+                  ),
+                  TextSpan(
+                    text: msg.content,
+                    style: const TextStyle(fontSize: 13, color: Color(0xF3E2E8F0)),
+                  ),
+                ],
               ),
             ),
-            TextSpan(
-              text: '[${formatChatClock(msg.timestamp)}] ',
-              style: const TextStyle(fontSize: 11, color: Color(0xD964748B)),
-            ),
-            TextSpan(
-              text: msg.content,
-              style: const TextStyle(fontSize: 13, color: Color(0xF3E2E8F0)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -790,9 +930,9 @@ class _SyncBar extends StatelessWidget {
             children: <Widget>[
               Text(
                 '[ 同步中: ${rendered.clamp(0, 200)}/200 ]',
-                style: TextStyle(fontFamily: 'Courier', fontSize: 12, color: tokens.neonPrimary.withValues(alpha: 0.82)),
+                style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 12, color: tokens.neonPrimary.withValues(alpha: 0.82)),
               ),
-              Text('$buffered buffered', style: TextStyle(fontFamily: 'Courier', fontSize: 12, color: tokens.neonPrimary.withValues(alpha: 0.82))),
+              Text('$buffered buffered', style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 12, color: tokens.neonPrimary.withValues(alpha: 0.82))),
             ],
           ),
           const SizedBox(height: 6),
@@ -1114,7 +1254,7 @@ class _SwitchingOverlay extends StatelessWidget {
                 Text(
                   '[ 正在切换频段至 SECTOR-$roomId ($roomName)... ]',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Courier', fontSize: 13, color: tokens.neonPrimary.withValues(alpha: 0.9)),
+                  style: TextStyle(fontFamily: CyberFonts.pixel, fontSize: 13, color: tokens.neonPrimary.withValues(alpha: 0.9)),
                 ),
                 const SizedBox(height: 12),
                 const LinearProgressIndicator(minHeight: 8, backgroundColor: Color(0xCC000000)),
@@ -1139,7 +1279,7 @@ class _ChaosOverlay extends StatelessWidget {
           child: Text(
             '[ SIGNALYLOST ]',
             style: TextStyle(
-              fontFamily: 'Courier',
+              fontFamily: CyberFonts.pixel,
               fontSize: 18,
               fontWeight: FontWeight.w700,
               letterSpacing: 6,
@@ -1168,7 +1308,7 @@ class _DataWipeOverlay extends StatelessWidget {
           'SECURE_ERASE · LOCAL_BUFFER_PURGE',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontFamily: 'Courier',
+            fontFamily: CyberFonts.pixel,
             fontSize: 14,
             letterSpacing: 4,
             color: const Color(0xFFECFDF5),

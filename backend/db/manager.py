@@ -39,6 +39,12 @@ class DatabaseManager:
             cyber_name=cyber_name,
         )
 
+    async def update_user_cyber_name(self, *, phone_number: str, cyber_name: str) -> bool:
+        return await self.provider.update_user_cyber_name(
+            phone_number=phone_number,
+            cyber_name=cyber_name,
+        )
+
     async def save_chat_message(
         self,
         *,
