@@ -37,6 +37,24 @@ class DatabaseProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def increment_identity_forge_count(
+        self,
+        *,
+        phone_number: str,
+        max_attempts: int,
+    ) -> int | None:
+        """
+        伪造身份计数 +1（仅当未达到上限）。
+        返回值：更新后的计数；若不存在用户或已达上限则返回 None。
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_identity_forge_count(self, *, phone_number: str) -> int | None:
+        """读取用户已使用的伪造次数；不存在返回 None。"""
+        raise NotImplementedError
+
+    @abstractmethod
     async def save_chat_message(
         self,
         *,

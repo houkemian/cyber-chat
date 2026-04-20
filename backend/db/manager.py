@@ -45,6 +45,20 @@ class DatabaseManager:
             cyber_name=cyber_name,
         )
 
+    async def increment_identity_forge_count(
+        self,
+        *,
+        phone_number: str,
+        max_attempts: int,
+    ) -> int | None:
+        return await self.provider.increment_identity_forge_count(
+            phone_number=phone_number,
+            max_attempts=max_attempts,
+        )
+
+    async def get_identity_forge_count(self, *, phone_number: str) -> int | None:
+        return await self.provider.get_identity_forge_count(phone_number=phone_number)
+
     async def save_chat_message(
         self,
         *,

@@ -20,6 +20,17 @@ class AuthResponse(BaseModel):
     cyber_name: str
 
 
+class ForgeIdentityPreviewResponse(BaseModel):
+    # 预生成候选昵称 + 剩余可生成次数
+    cyber_name: str
+    remaining_attempts: int
+
+
+class ForgeIdentitySaveRequest(BaseModel):
+    # 用户在弹窗中选定并提交保存的昵称
+    cyber_name: str = Field(min_length=1, max_length=128)
+
+
 class MobileVerifyRequest(BaseModel):
     # 运营商一键登录 SDK 返回的授权 token
     access_token: str = Field(min_length=6, max_length=2048)

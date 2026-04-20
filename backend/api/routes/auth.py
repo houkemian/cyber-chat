@@ -6,7 +6,14 @@ import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from core.settings import get_settings
-from schemas.auth import AuthResponse, MobileVerifyRequest, SendKeyRequest, VerifyKeyRequest
+from schemas.auth import (
+    AuthResponse,
+    ForgeIdentityPreviewResponse,
+    ForgeIdentitySaveRequest,
+    MobileVerifyRequest,
+    SendKeyRequest,
+    VerifyKeyRequest,
+)
 from utils.cyber_filter import dfa_filter
 from utils.generator import generate_cyber_name
 from utils.security import create_access_token
@@ -14,6 +21,7 @@ from utils.mobile_auth_service import mobile_auth_service
 from utils.sms_service import sms_service
 
 router = APIRouter(tags=["auth"])
+_MAX_IDENTITY_FORGE_ATTEMPTS = 999
 
 
 # ── content_moderation 依赖 ─────────────────────────────────
@@ -75,6 +83,19 @@ def _parse_bearer_token(authorization: str | None) -> str:
     return authorization[7:].strip()
 
 
+def _extract_phone_from_token(authorization: str | None) -> str:
+    token_str = _parse_bearer_token(authorization)
+    secret_key = get_settings().jwt_secret
+    try:
+        payload = jwt.decode(token_str, secret_key, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="invalid_token")
+    phone_number = payload.get("phone_number")
+    if not isinstance(phone_number, str) or not phone_number.strip():
+        raise HTTPException(status_code=401, detail="invalid_token")
+    return phone_number.strip()
+
+
 # ── 接口 0：POST /api/auth/forge-identity ────────────────────
 @router.post("/auth/forge-identity", response_model=AuthResponse)
 async def forge_identity(
@@ -84,20 +105,23 @@ async def forge_identity(
     """
     已登录用户伪造新身份：使用 generator.generate_cyber_name() 写入档案并重新签发 JWT。
     """
-    token_str = _parse_bearer_token(authorization)
+    phone_number = _extract_phone_from_token(authorization)
     secret_key = get_settings().jwt_secret
-    try:
-        payload = jwt.decode(token_str, secret_key, algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="invalid_token")
 
-    phone_number = payload.get("phone_number")
-    if not isinstance(phone_number, str) or not phone_number.strip():
-        raise HTTPException(status_code=401, detail="invalid_token")
-    phone_number = phone_number.strip()
+    db_manager = request.app.state.db
+    existing = await db_manager.get_user_cyber_name(phone_number=phone_number)
+    if existing is None:
+        created = await db_manager.create_user_profile(phone_number=phone_number, cyber_name=generate_cyber_name())
+        if not created:
+            raise HTTPException(status_code=500, detail="profile_create_failed")
+    next_count = await db_manager.increment_identity_forge_count(
+        phone_number=phone_number,
+        max_attempts=_MAX_IDENTITY_FORGE_ATTEMPTS,
+    )
+    if next_count is None:
+        raise HTTPException(status_code=429, detail="forge_attempts_exhausted")
 
     new_name = generate_cyber_name()
-    db_manager = request.app.state.db
     existing = await db_manager.get_user_cyber_name(phone_number=phone_number)
     if existing is None:
         await db_manager.create_user_profile(phone_number=phone_number, cyber_name=new_name)
@@ -109,6 +133,70 @@ async def forge_identity(
         if not updated:
             raise HTTPException(status_code=500, detail="identity_update_failed")
 
+    new_token = create_access_token(
+        secret_key=secret_key,
+        payload={
+            "phone_number": phone_number,
+            "cyber_name": new_name,
+        },
+        expires_delta=timedelta(hours=24),
+    )
+    return AuthResponse(token=new_token, cyber_name=new_name)
+
+
+@router.post("/auth/forge-identity/preview", response_model=ForgeIdentityPreviewResponse)
+async def forge_identity_preview(
+    request: Request,
+    authorization: str | None = Header(None),
+) -> ForgeIdentityPreviewResponse:
+    phone_number = _extract_phone_from_token(authorization)
+    db_manager = request.app.state.db
+    existing = await db_manager.get_user_cyber_name(phone_number=phone_number)
+    if existing is None:
+        created = await db_manager.create_user_profile(phone_number=phone_number, cyber_name=generate_cyber_name())
+        if not created:
+            raise HTTPException(status_code=500, detail="profile_create_failed")
+
+    next_count = await db_manager.increment_identity_forge_count(
+        phone_number=phone_number,
+        max_attempts=_MAX_IDENTITY_FORGE_ATTEMPTS,
+    )
+    if next_count is None:
+        raise HTTPException(status_code=429, detail="forge_attempts_exhausted")
+
+    remaining = max(0, _MAX_IDENTITY_FORGE_ATTEMPTS - next_count)
+    return ForgeIdentityPreviewResponse(
+        cyber_name=generate_cyber_name(),
+        remaining_attempts=remaining,
+    )
+
+
+@router.post("/auth/forge-identity/save", response_model=AuthResponse)
+async def forge_identity_save(
+    request: Request,
+    payload: ForgeIdentitySaveRequest,
+    authorization: str | None = Header(None),
+) -> AuthResponse:
+    phone_number = _extract_phone_from_token(authorization)
+    new_name = payload.cyber_name.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="invalid_cyber_name")
+
+    db_manager = request.app.state.db
+    existing = await db_manager.get_user_cyber_name(phone_number=phone_number)
+    if existing is None:
+        created = await db_manager.create_user_profile(phone_number=phone_number, cyber_name=new_name)
+        if not created:
+            raise HTTPException(status_code=500, detail="profile_create_failed")
+    else:
+        updated = await db_manager.update_user_cyber_name(
+            phone_number=phone_number,
+            cyber_name=new_name,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="identity_update_failed")
+
+    secret_key = get_settings().jwt_secret
     new_token = create_access_token(
         secret_key=secret_key,
         payload={

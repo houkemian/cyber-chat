@@ -7,7 +7,6 @@ import '../../core/storage/session_store.dart';
 import '../../core/theme/pixel_style.dart';
 import '../../core/theme/theme.dart';
 import '../../features/auth/data/auth_repository.dart';
-import 'forge_identity_menu.dart';
 import 'pix_button.dart';
 import 'pixel_avatar_shell.dart';
 
@@ -202,21 +201,6 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
   /// 与 Web `--chat-panel-r-inset` 对齐（头像右缘与下方聊天面板右边框）。
   double get _chatPanelRightInset => 14 + 3 + 2 + 2;
 
-  Future<void> _forgeIdentityFromMenu() async {
-    final String? token = await SessionStore.readToken();
-    if (token == null || token.isEmpty) {
-      throw AuthRepositoryException('未登录');
-    }
-    final AuthRepository repo = AuthRepository();
-    try {
-      final AuthResult r = await repo.forgeIdentity(token: token);
-      await SessionStore.saveSession(token: r.token, cyberName: r.cyberName);
-      await widget.onIdentityForged(r.cyberName);
-    } finally {
-      repo.dispose();
-    }
-  }
-
   Widget _buildAvatarMenu() {
     final idx = widget.avatarIdx.clamp(0, kAvatarPool.length - 1);
     final entry = kAvatarPool[idx];
@@ -234,31 +218,48 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
         ),
         child: PixelAvatarShell(imageUrl: url, pixelEmoji: entry.pixelEmoji),
         itemBuilder: (BuildContext context) => <PopupMenuEntry<Object?>>[
-          IdentityForgeMenuEntry(
-            cyberName: widget.cyberName,
-            onForge: _forgeIdentityFromMenu,
+          _MenuInfoEntry(
+            title: '当前赛博代号',
+            value: widget.cyberName?.trim().isNotEmpty == true ? widget.cyberName!.trim() : 'ANON',
+          ),
+          const _MenuInfoEntry(
+            title: '在线驻留时长',
+            value: 'UPLINK --:--:--',
           ),
           const PopupMenuDivider(height: 1),
-          PopupMenuItem<Object?>(
-            value: 'identity',
-            child: Text('身份重构模块 (Identity)', style: PixelStyle.vt323(fontSize: 12)),
+          _Win98MenuActionEntry(
+            label: '[ 伪造新身份 ]',
+            onTap: _showForgeIdentityDialog,
           ),
-          PopupMenuItem<Object?>(
-            value: 'out',
-            child: Text('终止当前进程 (Terminate PID)', style: PixelStyle.vt323(fontSize: 12)),
+          _Win98MenuActionEntry(
+            label: '[ 身份重构模块 ]',
+            onTap: _showIdentityModule,
+          ),
+          _Win98MenuActionEntry(
+            label: '[ 终止当前进程 ]',
+            onTap: widget.onLogout,
           ),
         ],
-        onSelected: (Object? value) {
-          if (value == 'identity') {
-            _showIdentityModule(context);
-          }
-          if (value == 'out') widget.onLogout();
-        },
       ),
     );
   }
 
-  Future<void> _showIdentityModule(BuildContext context) async {
+  Future<void> _showForgeIdentityDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      builder: (BuildContext ctx) {
+        return _ForgeIdentityDialog(
+          currentCyberName: widget.cyberName,
+          onSaved: (String newCyberName) async {
+            await widget.onIdentityForged(newCyberName);
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showIdentityModule() async {
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.62),
@@ -291,6 +292,322 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
           shadows: const <Shadow>[
             Shadow(color: Color(0xFFFF00FF), blurRadius: 0, offset: Offset(1, 1)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuInfoEntry extends PopupMenuEntry<Object?> {
+  const _MenuInfoEntry({
+    required this.title,
+    required this.value,
+  });
+
+  final String title;
+  final String value;
+
+  @override
+  double get height => 46;
+
+  @override
+  bool represents(Object? value) => false;
+
+  @override
+  State<_MenuInfoEntry> createState() => _MenuInfoEntryState();
+}
+
+class _MenuInfoEntryState extends State<_MenuInfoEntry> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            '>> ${widget.title}:',
+            style: PixelStyle.vt323(fontSize: 11, color: const Color(0xFF99F6E4), height: 1.2),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            widget.value,
+            style: PixelStyle.vt323(fontSize: 12, color: const Color(0xFFE0F2FE), height: 1.2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForgeIdentityDialog extends StatefulWidget {
+  const _ForgeIdentityDialog({
+    required this.currentCyberName,
+    required this.onSaved,
+  });
+
+  final String? currentCyberName;
+  final Future<void> Function(String newCyberName) onSaved;
+
+  @override
+  State<_ForgeIdentityDialog> createState() => _ForgeIdentityDialogState();
+}
+
+class _ForgeIdentityDialogState extends State<_ForgeIdentityDialog> {
+  String? _previewName;
+  int? _remainingAttempts;
+  bool _busy = true;
+  bool _saving = false;
+  String? _errorText;
+  late final AuthRepository _repo;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = AuthRepository();
+    _previewName = widget.currentCyberName;
+    _bootstrapPreview();
+  }
+
+  @override
+  void dispose() {
+    _repo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _bootstrapPreview() async {
+    await _regenerate();
+  }
+
+  Future<void> _regenerate() async {
+    if (_saving) return;
+    setState(() {
+      _busy = true;
+      _errorText = null;
+    });
+    try {
+      final String? token = await SessionStore.readToken();
+      if (token == null || token.isEmpty) {
+        throw AuthRepositoryException('未登录');
+      }
+      final ForgeIdentityPreview preview = await _repo.forgeIdentityPreview(token: token);
+      if (!mounted) return;
+      setState(() {
+        _previewName = preview.cyberName;
+        _remainingAttempts = preview.remainingAttempts;
+      });
+    } on AuthRepositoryException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorText = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _errorText = '昵称重构失败，请稍后重试');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    final String candidate = (_previewName ?? '').trim();
+    if (candidate.isEmpty || _saving || _busy) return;
+    setState(() {
+      _saving = true;
+      _errorText = null;
+    });
+    try {
+      final String? token = await SessionStore.readToken();
+      if (token == null || token.isEmpty) {
+        throw AuthRepositoryException('未登录');
+      }
+      final AuthResult r = await _repo.saveForgedIdentity(
+        token: token,
+        cyberName: candidate,
+      );
+      await SessionStore.saveSession(token: r.token, cyberName: r.cyberName);
+      await widget.onSaved(r.cyberName);
+      if (mounted) Navigator.of(context).pop();
+    } on AuthRepositoryException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorText = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _errorText = '保存失败，请稍后重试');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String displayName = _previewName ?? 'ANON';
+    final String remainText = _remainingAttempts == null ? '--' : '$_remainingAttempts';
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 360),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xF5081018),
+          border: Border.all(color: CyberPalette.neonCyan.withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              '伪造新身份',
+              style: PixelStyle.vt323(fontSize: 14, color: CyberPalette.neonCyan, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '可重新生成昵称并保存，当前总上限 999 次',
+              style: PixelStyle.vt323(fontSize: 11, color: CyberPalette.terminalGreen.withValues(alpha: 0.58)),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '候选昵称',
+              style: PixelStyle.vt323(fontSize: 11, color: const Color(0xFF99F6E4)),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D1224),
+                border: Border.all(color: CyberPalette.neonPurple.withValues(alpha: 0.55)),
+              ),
+              child: Text(
+                displayName,
+                style: PixelStyle.vt323(fontSize: 13, color: const Color(0xFFE0F2FE)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '剩余重构次数: $remainText',
+              style: PixelStyle.vt323(fontSize: 11, color: const Color(0xFFB7F9D0)),
+            ),
+            if (_errorText != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                _errorText!,
+                style: PixelStyle.vt323(fontSize: 11, color: const Color(0xFFFF7B7B)),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                PixButton(
+                  onTap: _busy ? null : _regenerate,
+                  enabled: !_busy && !_saving,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF0A1218),
+                  topLeft: CyberPalette.neonPurple.withValues(alpha: 0.65),
+                  bottomRight: const Color(0xFF1A1020),
+                  child: Text(
+                    _busy ? '[ 生成中... ]' : '[ 重新生成昵称 ]',
+                    style: PixelStyle.vt323(fontSize: 11, color: CyberPalette.neonCyan),
+                  ),
+                ),
+                PixButton(
+                  onTap: (_busy || _saving) ? null : _save,
+                  enabled: !_busy && !_saving,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF140A1C),
+                  topLeft: CyberPalette.neonCyan.withValues(alpha: 0.75),
+                  bottomRight: CyberPalette.neonPurple.withValues(alpha: 0.65),
+                  child: Text(
+                    _saving ? '[ 保存中... ]' : '[ 保存昵称 ]',
+                    style: PixelStyle.vt323(fontSize: 12, color: CyberPalette.terminalGreen),
+                  ),
+                ),
+                PixButton(
+                  onTap: (_busy || _saving) ? null : () => Navigator.of(context).pop(),
+                  enabled: !_busy && !_saving,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  face: const Color(0xFF151018),
+                  topLeft: const Color(0xFF553366),
+                  bottomRight: const Color(0xFF220022),
+                  child: Text('[ 关闭 ]', style: PixelStyle.vt323(fontSize: 12, color: const Color(0xFF8899AA))),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Win98MenuActionEntry extends PopupMenuEntry<Object?> {
+  const _Win98MenuActionEntry({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  double get height => 42;
+
+  @override
+  bool represents(Object? value) => false;
+
+  @override
+  State<_Win98MenuActionEntry> createState() => _Win98MenuActionEntryState();
+}
+
+class _Win98MenuActionEntryState extends State<_Win98MenuActionEntry> {
+  bool _pressed = false;
+
+  BoxDecoration _decoration(bool pressed) {
+    const Color hi = Color(0xFFFFFFFF);
+    const Color lo = Color(0xFF424242);
+    return BoxDecoration(
+      color: const Color(0xFFC0C0C0),
+      border: Border(
+        top: BorderSide(color: pressed ? lo : hi, width: 2),
+        left: BorderSide(color: pressed ? lo : hi, width: 2),
+        bottom: BorderSide(color: pressed ? hi : lo, width: 2),
+        right: BorderSide(color: pressed ? hi : lo, width: 2),
+      ),
+    );
+  }
+
+  void _handleTap() {
+    Navigator.of(context).pop<Object?>(null);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: _handleTap,
+        child: Container(
+          decoration: _decoration(_pressed),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Text(
+            widget.label,
+            style: const TextStyle(
+              fontFamily: CyberFonts.pixel,
+              fontSize: 11,
+              height: 1.2,
+              color: Colors.black,
+            ),
+          ),
         ),
       ),
     );

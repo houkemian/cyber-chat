@@ -13,6 +13,8 @@ class ApiEndpoints {
 
   /// POST，Header: `Authorization: Bearer <token>`，无 body。
   static String get forgeIdentityUrl => '$httpBaseUrl/api/auth/forge-identity';
+  static String get forgeIdentityPreviewUrl => '$httpBaseUrl/api/auth/forge-identity/preview';
+  static String get forgeIdentitySaveUrl => '$httpBaseUrl/api/auth/forge-identity/save';
 
   static String get chatWsBase => '$wsBaseUrl/api/ws';
 

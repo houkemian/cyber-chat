@@ -24,8 +24,15 @@ class PostgresProvider(DatabaseProvider):
                     id BIGSERIAL PRIMARY KEY,
                     phone_number TEXT NOT NULL UNIQUE,
                     cyber_name TEXT NOT NULL,
+                    identity_forge_count INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 )
+                """
+            )
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN IF NOT EXISTS identity_forge_count INTEGER NOT NULL DEFAULT 0
                 """
             )
             await conn.execute(
@@ -95,6 +102,46 @@ class PostgresProvider(DatabaseProvider):
                 phone_number,
             )
         return row is not None
+
+    async def increment_identity_forge_count(
+        self,
+        *,
+        phone_number: str,
+        max_attempts: int,
+    ) -> int | None:
+        if self._pool is None:
+            return None
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                UPDATE user_profiles
+                SET identity_forge_count = identity_forge_count + 1
+                WHERE phone_number = $1 AND identity_forge_count < $2
+                RETURNING identity_forge_count
+                """,
+                phone_number,
+                max_attempts,
+            )
+        if row is None:
+            return None
+        return int(row["identity_forge_count"])
+
+    async def get_identity_forge_count(self, *, phone_number: str) -> int | None:
+        if self._pool is None:
+            return None
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT identity_forge_count
+                FROM user_profiles
+                WHERE phone_number = $1
+                LIMIT 1
+                """,
+                phone_number,
+            )
+        if row is None:
+            return None
+        return int(row["identity_forge_count"])
 
     async def save_chat_message(
         self,

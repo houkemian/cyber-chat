@@ -38,10 +38,18 @@ class SQLiteProvider(DatabaseProvider):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 phone_number TEXT NOT NULL UNIQUE,
                 cyber_name TEXT NOT NULL,
+                identity_forge_count INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             )
             """
         )
+        # 兼容旧表结构（无 identity_forge_count 列）
+        cols = self._conn.execute("PRAGMA table_info(user_profiles)").fetchall()
+        col_names = {str(row[1]) for row in cols}
+        if "identity_forge_count" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE user_profiles ADD COLUMN identity_forge_count INTEGER NOT NULL DEFAULT 0"
+            )
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS chat_messages (
@@ -101,6 +109,45 @@ class SQLiteProvider(DatabaseProvider):
         )
         self._conn.commit()
         return cursor.rowcount > 0
+
+    async def increment_identity_forge_count(
+        self,
+        *,
+        phone_number: str,
+        max_attempts: int,
+    ) -> int | None:
+        if self._conn is None:
+            return None
+        cursor = self._conn.execute(
+            """
+            UPDATE user_profiles
+            SET identity_forge_count = identity_forge_count + 1
+            WHERE phone_number = ? AND identity_forge_count < ?
+            """,
+            (phone_number, max_attempts),
+        )
+        if cursor.rowcount <= 0:
+            self._conn.commit()
+            return None
+        row = self._conn.execute(
+            "SELECT identity_forge_count FROM user_profiles WHERE phone_number = ? LIMIT 1",
+            (phone_number,),
+        ).fetchone()
+        self._conn.commit()
+        if row is None:
+            return None
+        return int(row[0])
+
+    async def get_identity_forge_count(self, *, phone_number: str) -> int | None:
+        if self._conn is None:
+            return None
+        row = self._conn.execute(
+            "SELECT identity_forge_count FROM user_profiles WHERE phone_number = ? LIMIT 1",
+            (phone_number,),
+        ).fetchone()
+        if row is None:
+            return None
+        return int(row[0])
 
     async def save_chat_message(
         self,
