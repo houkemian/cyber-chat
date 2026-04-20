@@ -7,6 +7,7 @@ environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  audioplayers: ^6.6.0
   flutter:
     sdk: flutter
   http: ^1.2.2
@@ -23,6 +24,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/audio/electric_hum.wav
     - assets/images/2000_exe.png
   fonts:
     - family: PixelFont

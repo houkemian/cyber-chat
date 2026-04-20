@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../constants/avatar_pool.dart';
+import '../../core/audio/static_sfx.dart';
 import '../../core/storage/session_store.dart';
 import '../../core/theme/pixel_style.dart';
 import '../../core/theme/theme.dart';
@@ -382,6 +383,7 @@ class _ForgeIdentityDialogState extends State<_ForgeIdentityDialog> {
 
   Future<void> _regenerate() async {
     if (_saving) return;
+    StaticSfx.playElectricHum();
     setState(() {
       _busy = true;
       _errorText = null;
@@ -643,6 +645,7 @@ class _IdentityRefactorDialogState extends State<_IdentityRefactorDialog> {
 
   void _regenerate() {
     if (kAvatarPool.length <= 1) return;
+    StaticSfx.playElectricHum();
     setState(() {
       int next = _previewIdx;
       for (int k = 0; k < 32; k++) {
