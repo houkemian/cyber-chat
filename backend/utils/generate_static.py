@@ -2,7 +2,7 @@ import numpy as np
 import wave
 
 # 参数设置
-duration = 5.0  # 秒
+duration = 0.35  # 秒，作为按钮交互短音效
 sample_rate = 44100  # 采样率
 amplitude = 0.2  # 音量
 

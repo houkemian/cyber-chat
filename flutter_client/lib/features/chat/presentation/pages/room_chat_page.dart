@@ -268,7 +268,7 @@ class _SectorTabBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 6),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
             child: Text(
               '┌─ SECTOR_MAP.EXE ─ CHANNEL SELECT ─────────────────────────',
               style: PixelStyle.vt323(
@@ -278,35 +278,35 @@ class _SectorTabBar extends StatelessWidget {
               ),
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: <Widget>[
                 for (final MapEntry<int, SectorPreset> e in kPresetSectors.asMap().entries)
                   ...<Widget>[
-                    if (e.key > 0)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          '¦',
-                          style: PixelStyle.vt323(fontSize: 12, color: lineDim.withValues(alpha: 0.9)),
-                        ),
-                      ),
-                    GestureDetector(
-                      onTap: () => onSelect(e.value.id),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 168),
+                    if (e.key > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => onSelect(e.value.id),
                         child: () {
                           final SectorPreset s = e.value;
                           final bool active = s.id == roomId;
                           final String sid = _shortSectorId(s.id);
+                          final Color topLeft = active
+                              ? const Color(0xFF5AF0FF).withValues(alpha: 0.88)
+                              : const Color(0xFF2A3240);
+                          final Color bottomRight = active
+                              ? const Color(0xFF7B1CC8).withValues(alpha: 0.82)
+                              : borderIdle;
                           return Container(
                             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                             decoration: BoxDecoration(
-                              color: active ? const Color(0xFF050A08) : bgCell,
-                              border: Border.all(
-                                color: active ? tokens.neonPrimary : borderIdle,
-                                width: active ? 2 : 1,
+                              color: active ? const Color(0xFF080C18) : bgCell,
+                              border: Border(
+                                top: BorderSide(color: topLeft, width: active ? 2 : 1),
+                                left: BorderSide(color: topLeft, width: active ? 2 : 1),
+                                bottom: BorderSide(color: bottomRight, width: active ? 2 : 1),
+                                right: BorderSide(color: bottomRight, width: active ? 2 : 1),
                               ),
                             ),
                             child: Column(
@@ -322,6 +322,13 @@ class _SectorTabBar extends StatelessWidget {
                                         ? tokens.terminalAmber.withValues(alpha: 0.95)
                                         : CyberPalette.terminalGreen.withValues(alpha: 0.42),
                                   ),
+                                ),
+                                const SizedBox(height: 2),
+                                Container(
+                                  height: 1,
+                                  color: active
+                                      ? tokens.neonPrimary.withValues(alpha: 0.45)
+                                      : const Color(0xFF212733),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -999,13 +1006,16 @@ class _CmdPanelState extends State<_CmdPanel> {
     final g = CyberPalette.terminalGreen;
     final bool focus = _fieldFocus.hasFocus;
     final Color accent = t.neonPrimary;
-    final Color edgeIdle = accent.withValues(alpha: focus ? 0.75 : 0.42);
+    final Color edgeIdle = focus ? const Color(0xFF38405C) : const Color(0xFF262C40);
 
     final Border sunken = Border(
-      top: BorderSide(color: const Color(0xFF020810), width: 2),
-      left: BorderSide(color: const Color(0xFF020810), width: 2),
+      top: BorderSide(color: const Color(0xFF121528), width: 1),
+      left: BorderSide(color: const Color(0xFF121528), width: 1),
       bottom: BorderSide(color: edgeIdle, width: focus ? 2 : 1),
-      right: BorderSide(color: edgeIdle, width: focus ? 2 : 1),
+      right: BorderSide(
+        color: const Color(0xFF1B2032).withValues(alpha: focus ? 0.9 : 0.55),
+        width: focus ? 2 : 1,
+      ),
     );
 
     return Container(
@@ -1049,14 +1059,20 @@ class _CmdPanelState extends State<_CmdPanel> {
                   onTap: widget.onRadar,
                   child: Tooltip(
                     message: '终端雷达 · 扫描同频节点',
-                    child: Container(
+                    child: PixButton(
+                      onTap: widget.onRadar,
                       width: 44,
                       height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF060814),
-                        border: Border.all(color: accent.withValues(alpha: 0.55), width: 1),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      face: offlineExec
+                          ? Color.lerp(const Color(0xFF121018), t.neonSecondary, 0.08)!
+                          : Color.lerp(const Color(0xFF0C0614), t.neonSecondary, 0.28)!,
+                      topLeft: offlineExec
+                          ? t.neonPrimary.withValues(alpha: 0.42)
+                          : Color.lerp(t.neonPrimary, const Color(0xFFFFFFFF), 0.16)!,
+                      bottomRight: offlineExec
+                          ? t.neonSecondary.withValues(alpha: 0.35)
+                          : t.neonSecondary.withValues(alpha: 0.92),
                       child: CustomPaint(
                         size: const Size(30, 28),
                         painter: _RadarGlyphPainter(
@@ -1074,7 +1090,14 @@ class _CmdPanelState extends State<_CmdPanel> {
                   constraints: const BoxConstraints(minHeight: 40),
                   padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF010206),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Color(0xFF0B1222),
+                        Color(0xFF050913),
+                      ],
+                    ),
                     border: sunken,
                   ),
                   child: Row(
@@ -1109,6 +1132,9 @@ class _CmdPanelState extends State<_CmdPanel> {
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
                             hintText: widget.channelOnline
                                 ? '/whoami  /ls  /clear  · 广播...'
                                 : 'OFFLINE · /whoami /ls /clear',

@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../constants/avatar_pool.dart';
-import '../../core/audio/static_sfx.dart';
 import '../../core/storage/session_store.dart';
 import '../../core/theme/pixel_style.dart';
 import '../../core/theme/theme.dart';
@@ -43,18 +42,21 @@ class CyberHeaderBar extends StatefulWidget {
   State<CyberHeaderBar> createState() => _CyberHeaderBarState();
 }
 
-class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProviderStateMixin {
+class _CyberHeaderBarState extends State<CyberHeaderBar> with TickerProviderStateMixin {
   late final AnimationController _neonCtl;
+  late final AnimationController _rivetBlinkCtl;
 
   @override
   void initState() {
     super.initState();
     _neonCtl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat();
+    _rivetBlinkCtl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
   }
 
   @override
   void dispose() {
     _neonCtl.dispose();
+    _rivetBlinkCtl.dispose();
     super.dispose();
   }
 
@@ -154,12 +156,14 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
         ],
       );
 
+    final Widget headerPanel = _buildHeaderPanel(row, dense: widget.embeddedInCard);
+
     if (widget.embeddedInCard) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(padding: pad, child: row),
+          Padding(padding: pad, child: headerPanel),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20 * scale),
             child: Container(
@@ -181,21 +185,74 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
       );
     }
 
-    return Container(
+    return Padding(
       padding: pad,
+      child: headerPanel,
+    );
+  }
+
+  Widget _buildHeaderPanel(Widget row, {required bool dense}) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, dense ? 10 : 12, 12, dense ? 8 : 10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            Color(0xFF1C1430),
-            Color(0xFF100818),
-            Color(0xFF140C24),
-          ],
+        color: const Color(0xFF090D18),
+        border: Border(
+          top: BorderSide(color: const Color(0xFF2B3A58).withValues(alpha: 0.95), width: 2),
+          left: BorderSide(color: const Color(0xFF2B3A58).withValues(alpha: 0.95), width: 2),
+          bottom: BorderSide(color: CyberPalette.neonCyan.withValues(alpha: 0.52), width: 2),
+          right: BorderSide(color: CyberPalette.neonPurple.withValues(alpha: 0.42), width: 2),
         ),
-        border: Border.all(color: CyberPalette.neonCyan.withValues(alpha: 0.45)),
       ),
-      child: row,
+      child: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      const Color(0x221C2F52),
+                      Colors.transparent,
+                      const Color(0x22140D22),
+                    ],
+                    stops: const <double>[0.0, 0.45, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _HeaderScanlinePainter(),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 2,
+            top: 2,
+            child: AnimatedBuilder(
+              animation: _rivetBlinkCtl,
+              builder: (BuildContext context, Widget? child) {
+                final bool blinkOn = _rivetBlinkCtl.value < 0.5;
+                return Row(
+                  children: <Widget>[
+                    _HeaderRivet(active: blinkOn),
+                    const SizedBox(width: 6),
+                    _HeaderRivet(active: blinkOn),
+                  ],
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: row,
+          ),
+        ],
+      ),
     );
   }
 
@@ -228,15 +285,15 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
             value: 'UPLINK --:--:--',
           ),
           const PopupMenuDivider(height: 1),
-          _Win98MenuActionEntry(
+          _CyberMenuActionEntry(
             label: '[ 伪造新身份 ]',
             onTap: _showForgeIdentityDialog,
           ),
-          _Win98MenuActionEntry(
+          _CyberMenuActionEntry(
             label: '[ 身份重构模块 ]',
             onTap: _showIdentityModule,
           ),
-          _Win98MenuActionEntry(
+          _CyberMenuActionEntry(
             label: '[ 终止当前进程 ]',
             onTap: widget.onLogout,
           ),
@@ -294,6 +351,39 @@ class _CyberHeaderBarState extends State<CyberHeaderBar> with SingleTickerProvid
             Shadow(color: Color(0xFFFF00FF), blurRadius: 0, offset: Offset(1, 1)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderScanlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint p = Paint()
+      ..color = const Color(0xFF111827).withValues(alpha: 0.35)
+      ..strokeWidth = 1;
+    for (double y = 1; y < size.height; y += 3) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeaderScanlinePainter oldDelegate) => false;
+}
+
+class _HeaderRivet extends StatelessWidget {
+  const _HeaderRivet({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF7EEBFF) : const Color(0xFF4B5568),
+        border: Border.all(color: const Color(0xFF111827), width: 1),
       ),
     );
   }
@@ -383,7 +473,6 @@ class _ForgeIdentityDialogState extends State<_ForgeIdentityDialog> {
 
   Future<void> _regenerate() async {
     if (_saving) return;
-    StaticSfx.playElectricHum();
     setState(() {
       _busy = true;
       _errorText = null;
@@ -548,8 +637,8 @@ class _ForgeIdentityDialogState extends State<_ForgeIdentityDialog> {
   }
 }
 
-class _Win98MenuActionEntry extends PopupMenuEntry<Object?> {
-  const _Win98MenuActionEntry({
+class _CyberMenuActionEntry extends PopupMenuEntry<Object?> {
+  const _CyberMenuActionEntry({
     required this.label,
     required this.onTap,
   });
@@ -564,22 +653,62 @@ class _Win98MenuActionEntry extends PopupMenuEntry<Object?> {
   bool represents(Object? value) => false;
 
   @override
-  State<_Win98MenuActionEntry> createState() => _Win98MenuActionEntryState();
+  State<_CyberMenuActionEntry> createState() => _CyberMenuActionEntryState();
 }
 
-class _Win98MenuActionEntryState extends State<_Win98MenuActionEntry> {
+class _CyberMenuActionEntryState extends State<_CyberMenuActionEntry> {
   bool _pressed = false;
 
   BoxDecoration _decoration(bool pressed) {
-    const Color hi = Color(0xFFFFFFFF);
-    const Color lo = Color(0xFF424242);
+    final Color strokeA = pressed ? const Color(0xFF00B8D9) : const Color(0xFF00F0FF);
+    final Color strokeB = pressed ? const Color(0xFF7A11C8) : const Color(0xFFBC00FF);
+    final Color fillA = pressed ? const Color(0xFF1A1230) : const Color(0xFF1E1438);
+    final Color fillB = pressed ? const Color(0xFF0B0F1E) : const Color(0xFF101A2F);
     return BoxDecoration(
-      color: const Color(0xFFC0C0C0),
-      border: Border(
-        top: BorderSide(color: pressed ? lo : hi, width: 2),
-        left: BorderSide(color: pressed ? lo : hi, width: 2),
-        bottom: BorderSide(color: pressed ? hi : lo, width: 2),
-        right: BorderSide(color: pressed ? hi : lo, width: 2),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[fillA, fillB],
+      ),
+      border: Border.all(color: strokeA, width: 1.5),
+      boxShadow: <BoxShadow>[
+        BoxShadow(color: strokeA.withValues(alpha: 0.35), blurRadius: 0, spreadRadius: 0),
+        BoxShadow(color: strokeB.withValues(alpha: 0.45), blurRadius: 0, spreadRadius: 0, offset: const Offset(1, 1)),
+      ],
+    );
+  }
+
+  TextStyle _labelStyle(bool pressed) {
+    return PixelStyle.vt323(
+      fontSize: 11,
+      height: 1.2,
+      color: pressed ? const Color(0xFFE6F7FF) : const Color(0xFFB9F7FF),
+      letterSpacing: 1.0,
+      shadows: <Shadow>[
+        Shadow(
+          color: (pressed ? const Color(0xFF00D8FF) : const Color(0xFF00F0FF)).withValues(alpha: 0.8),
+          blurRadius: 0,
+          offset: const Offset(1, 0),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScanlineOverlay() {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              Colors.white.withValues(alpha: 0.12),
+              Colors.transparent,
+              Colors.white.withValues(alpha: 0.04),
+            ],
+            stops: const <double>[0, 0.5, 1],
+          ),
+        ),
       ),
     );
   }
@@ -601,14 +730,14 @@ class _Win98MenuActionEntryState extends State<_Win98MenuActionEntry> {
         child: Container(
           decoration: _decoration(_pressed),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontFamily: CyberFonts.pixel,
-              fontSize: 11,
-              height: 1.2,
-              color: Colors.black,
-            ),
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(child: _buildScanlineOverlay()),
+              Text(
+                widget.label,
+                style: _labelStyle(_pressed),
+              ),
+            ],
           ),
         ),
       ),
@@ -645,7 +774,6 @@ class _IdentityRefactorDialogState extends State<_IdentityRefactorDialog> {
 
   void _regenerate() {
     if (kAvatarPool.length <= 1) return;
-    StaticSfx.playElectricHum();
     setState(() {
       int next = _previewIdx;
       for (int k = 0; k < 32; k++) {
