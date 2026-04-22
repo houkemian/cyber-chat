@@ -20,15 +20,14 @@ services:
     ports:
       - "20002:8000"
     environment:
-      # 切换到 Postgres 数据库连接
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-cyber_user}:${POSTGRES_PASSWORD:-super_secret_pwd}@db:5432/${POSTGRES_DB:-cyber_chat}
+      # 使用外部托管数据库（例如 Neon）的连接串
+      - DATABASE_URL=${DATABASE_URL}
       # 接入 Redis
       - REDIS_URL=redis://redis:6379/0
       - ENV=production
       - DEEPSEEK_MODEL=deepseek-chat
       - DEEPSEEK_SUMMARY_MODEL=deepseek-chat
     depends_on:
-      - db
       - redis
     deploy:
       resources:
@@ -54,27 +53,7 @@ services:
     logging: *default-logging
 
   # ----------------------------------------
-  # 3. 持久化数据库 (PostgreSQL)
-  # ----------------------------------------
-  db:
-    image: postgres:15-alpine
-    restart: always
-    env_file:
-      - ./backend/.env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-cyber_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-super_secret_pwd}
-      POSTGRES_DB: ${POSTGRES_DB:-cyber_chat}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    logging: *default-logging
-
-  # ----------------------------------------
-  # 4. 高速缓存 (Redis)
+  # 3. 高速缓存 (Redis)
   # ----------------------------------------
   redis:
     image: redis:7-alpine
@@ -89,5 +68,4 @@ services:
 
 # 声明持久化数据卷
 volumes:
-  postgres_data:
   redis_data:
