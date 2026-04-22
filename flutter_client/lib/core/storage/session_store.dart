@@ -29,12 +29,17 @@ class SessionStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(keyCyberToken, token);
     await prefs.setString(keyCyberName, cyberName);
+    // 仅在会话初次建立时写入接驳时间，后续刷新 token（如伪造身份）不重置。
+    if (prefs.getString(keyCfsUplinkIso) == null) {
+      await prefs.setString(keyCfsUplinkIso, DateTime.now().toUtc().toIso8601String());
+    }
   }
 
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(keyCyberToken);
     await prefs.remove(keyCyberName);
+    await prefs.remove(keyCfsUplinkIso);
   }
 
   /// 持久化头像池下标，与 Web `AVATAR_STORAGE_KEY` 一致。

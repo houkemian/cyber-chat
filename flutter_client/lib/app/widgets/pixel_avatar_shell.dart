@@ -92,11 +92,11 @@ class _PixelAvatarShellState extends State<PixelAvatarShell> with SingleTickerPr
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: const Color(0xFF080A12),
-                    border: Border(
-                      top: BorderSide(color: CyberPalette.neonCyan.withValues(alpha: 0.88), width: 1),
-                      left: BorderSide(color: CyberPalette.neonCyan.withValues(alpha: 0.88), width: 1),
-                      bottom: BorderSide(color: CyberPalette.neonPurple.withValues(alpha: 0.75), width: 1),
-                      right: BorderSide(color: CyberPalette.neonPurple.withValues(alpha: 0.75), width: 1),
+                    border: const Border(
+                      top: BorderSide(color: Color(0xFF8A9299), width: 2),
+                      left: BorderSide(color: Color(0xFF6E7880), width: 2),
+                      bottom: BorderSide(color: Color(0xFF1A1E24), width: 2),
+                      right: BorderSide(color: Color(0xFF252B32), width: 2),
                     ),
                   ),
                   child: Padding(

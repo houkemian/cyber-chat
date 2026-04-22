@@ -268,17 +268,6 @@ class _SectorTabBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-            child: Text(
-              '┌─ SECTOR_MAP.EXE ─ CHANNEL SELECT ─────────────────────────',
-              style: PixelStyle.vt323(
-                fontSize: 11,
-                letterSpacing: 0.5,
-                color: CyberPalette.terminalGreen.withValues(alpha: 0.45),
-              ),
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: <Widget>[
@@ -291,7 +280,6 @@ class _SectorTabBar extends StatelessWidget {
                         child: () {
                           final SectorPreset s = e.value;
                           final bool active = s.id == roomId;
-                          final String sid = _shortSectorId(s.id);
                           final Color topLeft = active
                               ? const Color(0xFF5AF0FF).withValues(alpha: 0.88)
                               : const Color(0xFF2A3240);
@@ -299,7 +287,7 @@ class _SectorTabBar extends StatelessWidget {
                               ? const Color(0xFF7B1CC8).withValues(alpha: 0.82)
                               : borderIdle;
                           return Container(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                            padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
                             decoration: BoxDecoration(
                               color: active ? const Color(0xFF080C18) : bgCell,
                               border: Border(
@@ -313,30 +301,19 @@ class _SectorTabBar extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
-                                Text(
-                                  '[ CH-$sid ]',
-                                  style: PixelStyle.vt323(
-                                    fontSize: 10,
-                                    letterSpacing: 1,
-                                    color: active
-                                        ? tokens.terminalAmber.withValues(alpha: 0.95)
-                                        : CyberPalette.terminalGreen.withValues(alpha: 0.42),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
                                 Container(
                                   height: 1,
                                   color: active
                                       ? tokens.neonPrimary.withValues(alpha: 0.45)
                                       : const Color(0xFF212733),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 3),
                                 Text(
                                   s.name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: PixelStyle.vt323(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     height: 1.2,
                                     color: active
                                         ? tokens.neonPrimary.withValues(alpha: 0.95)
@@ -888,7 +865,9 @@ class _ChatLine extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: _nameFontSize,
-                      color: odd ? tokens.neonSecondary : tokens.neonPrimary,
+                      color: odd
+                          ? Color.lerp(tokens.neonSecondary, const Color(0xFFE0F2FE), 0.32)!
+                          : Color.lerp(tokens.neonPrimary, const Color(0xFFD1FAE5), 0.2)!,
                     ),
                   ),
                   TextSpan(
@@ -1039,17 +1018,6 @@ class _CmdPanelState extends State<_CmdPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 6),
-            child: Text(
-              '┌─ TX_BUFFER.EXE ─ UPLINK ───────────────────',
-              style: PixelStyle.vt323(
-                fontSize: 10,
-                letterSpacing: 0.25,
-                color: CyberPalette.neonCyan.withValues(alpha: 0.38),
-              ),
-            ),
-          ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
