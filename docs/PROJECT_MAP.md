@@ -6,18 +6,31 @@
 
 ```
 cyber_chat/
-├── backend/          # FastAPI · main.py · models.py
-│   ├── api/routes/   # auth · chat（WS+history+members）· announcements
-│   ├── services/     # announcements_cache 等
-│   ├── utils/        # ws_manager.py · security.py · generator.py
-│   ├── db/ · cache/  # SQLite 默认 · 内存缓存
+├── backend/                  # FastAPI · main.py · models.py
+│   ├── api/routes/           # auth · chat（WS+history+members）· announcements
+│   ├── services/             # announcements_cache 等
+│   ├── utils/                # ws_manager.py · security.py · generator.py
+│   ├── db/ · cache/          # SQLite 默认 · 内存缓存
 │   └── data/cyber_chat.db
 ├── frontend/
 │   └── src/
 │       ├── App.tsx · main.tsx · index.css
 │       ├── pages/LoginTerminal.tsx · RoomChat.tsx
 │       └── config/api.ts
-├── docs/             # 架构分卷 + ARCHITECTURE_v*.md
+├── flutter_client/           # Flutter 移动端客户端（2000.exe App）
+│   ├── lib/
+│   │   ├── app/              # CyberChatApp · CyberShell · widgets/
+│   │   │   └── widgets/      # CyberHeaderBar · PixelAvatarShell · PixButton …
+│   │   ├── core/
+│   │   │   ├── constants/    # api_endpoints.dart
+│   │   │   ├── storage/      # session_store.dart（token · cyberName · avatarIdx · 登录时间戳）
+│   │   │   └── theme/        # CyberPalette · PixelStyle · CyberTheme
+│   │   ├── features/
+│   │   │   ├── auth/         # AuthRepository（forge-identity · save）· LoginModal
+│   │   │   └── chat/         # RoomChatPage（多扇区 · WS · 历史）
+│   │   └── widgets/          # UptimeMonitor · PingMonitor
+│   └── pubspec.yaml
+├── docs/                     # 架构分卷 + ARCHITECTURE_v*.md
 ├── docker-compose.yml
 └── .github/workflows/deploy.yml
 ```
@@ -39,6 +52,8 @@ cyber_chat/
 |------|------|------|
 | `POST` | `/api/auth/send-key` | 下发验证码（开发：控制台） |
 | `POST` | `/api/auth/verify` | 校验 → JWT + `cyber_name` |
+| `POST` | `/api/auth/forge-identity/preview` | 生成预览新昵称；返回 `cyber_name` + `remaining_attempts`；累计上限 999 次 |
+| `POST` | `/api/auth/forge-identity/save` | 持久化选定昵称 → 刷新 JWT + 更新 `user_profiles.cyber_name` |
 | `WS` | `/api/ws/{room_id}?token=` | 实时聊天；广播含 `online_count` |
 | `GET` | `/api/ws/rooms/{room_id}/members` | 在线成员（去重）+ `online_count` |
 | `GET` | `/api/chat/history/{room_id}?limit=200` | 房间最近 200 条 chat |

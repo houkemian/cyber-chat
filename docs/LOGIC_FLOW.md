@@ -144,3 +144,60 @@
 
 - `POST /api/auth/send-key`、`POST /api/auth/verify` → JWT（HS256，默认 24h）+ `cyber_name`。
 - 生产需替换默认 `JWT_SECRET`、收紧 CORS；开发万能码等事项见 `ARCHITECTURE_v4.md` Phase-4。
+
+---
+
+## 6. Flutter 客户端：鉴权与会话逻辑
+
+> 代码锚点：`flutter_client/lib/core/storage/session_store.dart`、`lib/features/auth/data/auth_repository.dart`、`lib/app/cyber_shell.dart`、`lib/app/widgets/cyber_header_bar.dart`
+
+### 6.1 SessionStore（本地持久化）
+
+| 键 | 类型 | 说明 |
+|----|------|------|
+| `cfs_token` | `String` | JWT，登录成功写入，登出时清除 |
+| `cfs_cyber_name` | `String` | 当前赛博代号，forge-save 后同步更新 |
+| `cfs_avatar_idx` | `int` | 头像池下标，默认 0 |
+| `cfs_uplink_iso` | `String` | 登录时刻 ISO 8601 时间戳；**首次登录时写入，登出时清除，中途不覆盖** |
+
+### 6.2 启动恢复流程（CyberShell）
+
+```
+initState
+  → SessionStore.readToken / readCyberName / readCyberAvatarIdx
+  → 若 token 非空：_loggedIn = true，加载聊天页（RoomChatPage）
+  → 若 token 为空：显示「传送：GO!」入口，RoomChatPage 以离线模式浏览
+```
+
+### 6.3 身份重构流程（forge-identity）
+
+```
+_showForgeIdentityDialog
+  → POST /api/auth/forge-identity/preview（携带 JWT）
+  → 返回 { cyber_name, remaining_attempts }
+  → 用户可多次「重新生成」（每次消耗 1 次，上限 999）
+  → 用户点「保存」→ POST /api/auth/forge-identity/save
+  → 返回新 JWT + cyber_name → SessionStore.saveSession（更新 token / cyber_name）
+  → widget.onIdentityForged(newCyberName) → CyberShell setState → RoomChatPage key 递增（强制重建）
+```
+
+### 6.4 紧急脱机流程（EJECT）
+
+```
+点击「紧急脱机」
+  → showGeneralDialog 二次确认
+  → 确认 → debugPrint('WebSocket Ejected')
+  → OverlayEntry 插入 _CrtShutdownOverlay（1s 关机动画：Y 轴压线 → X 轴收点 → 全黑）
+  → 动画完成 → widget.onLogout()（SessionStore.clearSession）→ Navigator.pushReplacementNamed('/')
+```
+
+### 6.5 自毁程序流程（FORMAT C:）
+
+```
+点击「[ 自毁程序 ]」
+  → showGeneralDialog 全屏终端弹窗（打字机输出双语警告，28ms/字）
+  → 用户点「[ Y_EXECUTE ]」
+  → SharedPreferences.getInstance().then(p => p.clear())  // 清空全部本地缓存
+  → OverlayEntry 插入 _RedFlashOverlay（900ms 红色闪烁：3 次交替 → 全黑）
+  → widget.onLogout() → Navigator.pushReplacementNamed('/')
+```

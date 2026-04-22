@@ -4,7 +4,7 @@
 
 ---
 
-## 2. 项目目录结构（全量快照 · 2026-04-02）
+## 2. 项目目录结构（全量快照 · 2026-04-21）
 
 ```
 cyber_chat/
@@ -65,6 +65,19 @@ cyber_chat/
 │   ├── nginx.conf                # 单页 SPA + gzip 配置
 │   ├── package.json
 │   └── vite.config.ts            # base: '/cyber-chat/'
+├── flutter_client/
+│   ├── lib/
+│   │   ├── app/
+│   │   │   └── widgets/          # CyberHeaderBar · PixelAvatarShell · PixButton …
+│   │   ├── core/
+│   │   │   ├── constants/        # api_endpoints.dart
+│   │   │   ├── storage/          # session_store.dart
+│   │   │   └── theme/            # CyberPalette · PixelStyle
+│   │   ├── features/
+│   │   │   ├── auth/             # AuthRepository · LoginModal
+│   │   │   └── chat/             # RoomChatPage
+│   │   └── widgets/              # UptimeMonitor · PingMonitor
+│   └── pubspec.yaml
 ├── docs/
 │   ├── ARCHITECTURE_v1.md … v4.md
 │   ├── PROJECT_MAP.md · STYLE_GUIDE.md · LOGIC_FLOW.md · SNAPSHOT_MINI.md
@@ -128,6 +141,8 @@ cyber_chat/
 |------|------|------|------|
 | `POST` | `/api/auth/send-key` | 无 | 发送验证码（控制台打印） |
 | `POST` | `/api/auth/verify` | 无 | 验证码核验 → JWT + cyber_name |
+| `POST` | `/api/auth/forge-identity/preview` | JWT | 生成预览新昵称；返回 `cyber_name` + `remaining_attempts`；上限 999 次 |
+| `POST` | `/api/auth/forge-identity/save` | JWT | 保存选定昵称 → 刷新 JWT + 写 `user_profiles` |
 | `WS` | `/api/ws/{room_id}?token=` | JWT | 实时聊天；广播 `online_count`（去重人数） |
 | `GET` | `/api/ws/rooms/{room_id}/members` | 无 | 当前扇区在线成员 `cyber_name[]` + `online_count`（与连接池一致） |
 | `GET` | `/api/chat/history/{room_id}?limit=200` | 无 | 拉取历史（最近 200 条 chat） |

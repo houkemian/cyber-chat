@@ -2,7 +2,7 @@
 # 2000.exe · 架构中枢（索引版 · 2026-04）
 
 > **定位**：全项目「为什么这样设计」的叙事入口与 Phase 路线图；**细粒度技术细节已拆到分卷**，避免单文件膨胀。  
-> **快照时间**：2026-04-03 · **仓库**：https://github.com/houkemian/cyber-chat  
+> **快照时间**：2026-04-21 · **仓库**：https://github.com/houkemian/cyber-chat  
 > **前序文档**：[ARCHITECTURE_v3.md](./ARCHITECTURE_v3.md)
 
 ---
@@ -77,6 +77,15 @@
 - **Phase-3**：三区布局与公告轮播、头像池、成员探测与系统消息分级、行内消息排版、退出与 WS 清理、移动端 Header 与 `100dvh`/safe-area。  
 - **Phase-3.5**：命令面板重排、通电闪烁、全屏雷达、`12% / 18% / flex:1` 三区比例。  
 - **Phase-3.5+**：CFS、CRT 滤镜、顶栏对齐与 `cyberName` 注入、**GET `/api/ws/rooms/{room_id}/members`**、前端消息列表 **200 条上限**（与后端一致）、A2HS（Manifest + SW + 图标 + 安装引导）。
+- **Phase-4（Flutter 客户端）**：
+  - **身份重构**：`POST /api/auth/forge-identity/preview`（预览随机新昵称，累计上限 999 次）、`POST /api/auth/forge-identity/save`（持久化选定昵称并刷新 JWT）；后端新增 `identity_forge_count` 字段（SQLite / PostgreSQL 均已 migration）。
+  - **头像菜单信息面板**：`当前赛博代号`（只读展示）、`神经接驭时长`（`UptimeMonitor`，基于 `SessionStore` 登录时间戳跨菜单持久计时）、`链路延迟监控`（`PingMonitor`，模拟延迟 + OK/WARN/ERR 颜色状态）。
+  - **紧急脱机 EJECT**：Win95 浮雕暗红按钮，点击弹二次确认，确认后播 1s CRT 关机动画（Y 轴压线 → X 轴收点 → 全黑），再执行登出并导航回初始页。
+  - **自毁程序 FORMAT C:**：全屏纯黑终端弹窗，打字机效果逐字输出双语警告（28ms/字），呈现 `[ Y_EXECUTE ]` / `[ N_ABORT ]`；确认后 `SharedPreferences.clear()` 清空全部本地缓存，900ms 红色闪烁 Overlay，强制退出登录。
+  - **兔子洞彩蛋**：在「神经接驭时长」条目 500ms 内连点 5 次触发；播 600ms 像素 Glitch Overlay，再弹血色 `UNAUTHORIZED ACCESS DETECTED` 弹窗，展示开发者联系邮箱。
+  - **READ_ME.TXT**：菜单底部隐藏入口，全屏纯黑命令行风格弹窗，内含黑客宣言与联系方式。
+  - **头像边框做旧**：`PixelAvatarShell` 边框由霓虹 cyan/purple 改为 Win95 磨旧金属浮雕（上左亮灰 / 下右深影）。
+  - **聊天室 UI 精修**：输入区内边框统一、雷达/发射按钮风格对齐、扇区列表全宽水平排布无横滚、消息奇偶行昵称颜色提亮、移除冗余页眉文字。
 
 ---
 
@@ -145,12 +154,12 @@
 > **范围**：顶栏右侧头像触发的下拉/弹出菜单（Web 与 Flutter 客户端应对齐叙事；实现细节见各端 `App` / `CyberHeaderBar`）。  
 > **原则**：匿名树洞语境下，菜单宜短、可预期；重操作走二次确认，敏感能力不与「实时聊天主链路」抢线程。
 
-### 16.1 现状（快照）
+### 16.1 现状（快照 · 2026-04-21）
 
 | 端 | 已具备 | 备注 |
 |----|--------|------|
 | Web | 身份文案（Uplink Key / `cyberName`）、退出 | 历史曾含「添加到主屏幕 / 扫码」等安装引导，以 PWA 与 Manifest 为准迭代 |
-| Flutter | 身份展示、`终止当前进程`（退出登录） | 已去掉「部署到主屏幕」「下载移动端矩阵」；原生安装与分发走应用商店 / 侧载，不在此菜单重复 |
+| Flutter | **当前赛博代号**（只读）、**神经接驭时长**（UptimeMonitor）、**链路延迟监控**（PingMonitor）、**伪造新身份**（forge-identity 接口，支持预览/重生成/保存，上限 999 次）、**身份重构模块**（像素头像池随机换）、**紧急脱机 EJECT**（CRT 关机动画 + 确认框）、**自毁程序 FORMAT C:**（终端打字机确认 + SharedPreferences 全清）、**READ_ME.TXT**（黑客宣言隐藏入口）；连击彩蛋：神经接驭时长连点 5 次触发兔子洞 |
 
 ### 16.2 建议项（可按 Phase 取舍）
 
